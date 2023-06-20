@@ -658,6 +658,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairo-lang-lean"
+version = "2.6.3"
+dependencies = [
+ "cairo-lang-casm",
+ "cairo-lang-sierra-to-casm",
+ "cairo-lang-utils",
+ "itertools 0.12.1",
+]
+
+[[package]]
 name = "cairo-lang-lowering"
 version = "2.6.3"
 dependencies = [
@@ -1093,6 +1103,7 @@ name = "cairo-lang-test-utils"
 version = "2.6.3"
 dependencies = [
  "cairo-lang-formatter",
+ "cairo-lang-lean",
  "cairo-lang-utils",
  "colored",
  "env_logger",
@@ -3849,6 +3860,7 @@ dependencies = [
  "cairo-lang-defs",
  "cairo-lang-diagnostics",
  "cairo-lang-filesystem",
+ "cairo-lang-lean",
  "cairo-lang-lowering",
  "cairo-lang-parser",
  "cairo-lang-plugins",
