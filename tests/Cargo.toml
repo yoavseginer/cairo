@@ -26,6 +26,7 @@ cairo-lang-sierra-to-casm = { path = "../crates/cairo-lang-sierra-to-casm", feat
 cairo-lang-syntax = { path = "../crates/cairo-lang-syntax", version = "2.0.0-rc2" }
 cairo-lang-test-utils = { path = "../crates/cairo-lang-test-utils", version = "2.0.0-rc2" }
 cairo-lang-utils = { path = "../crates/cairo-lang-utils", version = "2.0.0-rc2" }
+cairo-lang-lean = { path = "../crates/cairo-lang-lean", version = "2.0.0-rc2" }
 env_logger.workspace = true
 itertools.workspace = true
 log.workspace = true

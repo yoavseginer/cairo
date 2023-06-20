@@ -7,6 +7,7 @@ use std::path::Path;
 
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
 use cairo_lang_utils::ResultHelper;
+use cairo_lang_lean::lean_generator::write_lean_soundness_file;
 
 const TAG_PREFIX: &str = "//! > ";
 const TEST_SEPARATOR: &str =
@@ -121,6 +122,7 @@ impl TestBuilder {
     fn new_test(&mut self) {
         self.close_open_tag();
         let name = self.current_test_name.as_ref().expect("No name found for test.");
+        self.current_test.as_mut().expect("No test found.").attributes.entry("test_name".into()).or_insert(name.into());
         let old_test =
             self.tests.insert(name.clone(), std::mem::take(&mut self.current_test).unwrap());
         assert!(old_test.is_none(), "Found two tests named {name}.");
@@ -291,6 +293,7 @@ pub fn run_test_file(
 ) -> Result<(), std::io::Error> {
     let filename = path.file_name().unwrap().to_str().unwrap();
     let is_fix_mode = std::env::var("CAIRO_FIX_TESTS") == Ok("1".into());
+    let gen_lean_mode = std::env::var("CAIRO_GEN_LEAN") == Ok("1".into());
     let tests = parse_test_file(path)?;
     let mut new_tests = OrderedHashMap::<String, Test>::default();
     for (test_name, test) in tests {
@@ -310,6 +313,10 @@ pub fn run_test_file(
         };
 
         pretty_assertions::assert_eq!(get_attr("test_runner_name"), runner_name);
+
+        if gen_lean_mode {
+            write_lean_soundness_file(&path, &test_name, outputs.get("lean_soundness"))?;
+        }
 
         if is_fix_mode {
             let mut new_test = test.clone();

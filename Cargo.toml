@@ -10,6 +10,7 @@ members = [
     "crates/cairo-lang-filesystem",
     "crates/cairo-lang-formatter",
     "crates/cairo-lang-language-server",
+    "crates/cairo-lang-lean",
     "crates/cairo-lang-lowering",
     "crates/cairo-lang-parser",
     "crates/cairo-lang-plugins",

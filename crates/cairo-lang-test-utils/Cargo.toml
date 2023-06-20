@@ -8,6 +8,7 @@ description = "Utilities for writing tests in the Cairo compiler project."
 
 [dependencies]
 cairo-lang-utils = { path = "../cairo-lang-utils", version = "2.0.0-rc2" }
+cairo-lang-lean = { path = "../cairo-lang-lean",  version = "2.0.0-rc2" }
 log.workspace = true
 pretty_assertions.workspace = true
 

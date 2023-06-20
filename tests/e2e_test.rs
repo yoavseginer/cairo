@@ -16,6 +16,7 @@ use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
 use cairo_lang_utils::Upcast;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use cairo_lang_lean::lean_generator::generate_lean_soundness;
 
 /// Salsa database configured to find the corelib, when reused by different tests should be able to
 /// use the cached queries that rely on the corelib's code, which vastly reduces the tests runtime.
@@ -109,14 +110,17 @@ impl TestFileRunner for SmallE2ETestRunner {
             .join("\n");
 
         // Compile to casm.
-        let casm = cairo_lang_sierra_to_casm::compiler::compile(&sierra_program, &metadata, true)
-            .unwrap()
-            .to_string();
+        let cairo_program = cairo_lang_sierra_to_casm::compiler::compile(&sierra_program, &metadata, true)
+            .unwrap();
+
+        let casm = cairo_program.to_string();
+        let lean_soundness = generate_lean_soundness(inputs["test_name"].as_str(), &cairo_program);
 
         OrderedHashMap::from([
             ("casm".into(), casm),
             ("function_costs".into(), function_costs_str),
             ("sierra_code".into(), sierra_program_str),
+            ("lean_soundness".into(), lean_soundness),
         ])
     }
 }
@@ -150,14 +154,17 @@ impl TestFileRunner for SmallE2ETestRunnerSkipAddGas {
             .join("\n");
 
         // Compile to casm.
-        let casm = cairo_lang_sierra_to_casm::compiler::compile(&sierra_program, &metadata, true)
-            .unwrap()
-            .to_string();
+        let cairo_program = cairo_lang_sierra_to_casm::compiler::compile(&sierra_program, &metadata, true)
+            .unwrap();
+
+        let casm = cairo_program.to_string();
+        let lean_soundness = generate_lean_soundness(inputs["test_name"].as_str(), &cairo_program);
 
         OrderedHashMap::from([
             ("casm".into(), casm),
             ("function_costs".into(), function_costs_str),
             ("sierra_code".into(), sierra_program_str),
+            ("lean_soundness".into(), lean_soundness),
         ])
     }
 }
