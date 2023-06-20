@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use cairo_lang_casm::builder::CasmBuilderAuxiliaryInfo;
 use cairo_lang_casm::instructions::{Instruction, InstructionBody, RetInstruction};
 use cairo_lang_sierra::extensions::core::{CoreConcreteLibfunc, CoreLibfunc, CoreType};
 use cairo_lang_sierra::extensions::lib_func::SierraApChange;
@@ -53,6 +54,7 @@ pub enum CompilationError {
 pub struct CairoProgram {
     pub instructions: Vec<Instruction>,
     pub debug_info: CairoProgramDebugInfo,
+    pub aux_info: Option<CasmBuilderAuxiliaryInfo>,
 }
 impl Display for CairoProgram {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -130,6 +132,7 @@ pub fn compile(
     .map_err(|err| Box::new(err.into()))?;
 
     let mut program_offset: usize = 0;
+    let mut last_aux_info: Option<CasmBuilderAuxiliaryInfo> = None;
 
     for (statement_id, statement) in program.statements.iter().enumerate() {
         let statement_idx = StatementIdx(statement_id);
@@ -197,6 +200,12 @@ pub fn compile(
                 )
                 .map_err(|error| CompilationError::InvocationError { statement_idx, error })?;
 
+                if let Some(aux_info) = compiled_invocation.aux_info {
+                    if last_aux_info == None && aux_info.not_empty() {
+                        last_aux_info = Some(aux_info);
+                    }
+                }
+
                 for instruction in &compiled_invocation.instructions {
                     program_offset += instruction.body.op_size();
                 }
@@ -260,6 +269,7 @@ pub fn compile(
                 .map(|code_offset| SierraStatementDebugInfo { code_offset })
                 .collect(),
         },
+        aux_info: last_aux_info,
     })
 }
 

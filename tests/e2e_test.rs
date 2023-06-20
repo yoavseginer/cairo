@@ -20,6 +20,7 @@ use cairo_lang_utils::unordered_hash_map::UnorderedHashMap;
 use cairo_lang_utils::Upcast;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use cairo_lang_lean::lean_generator::generate_lean_soundness;
 
 /// Salsa databases configured to find the corelib, when reused by different tests should be able to
 /// use the cached queries that rely on the corelib's code, which vastly reduces the tests runtime.
@@ -196,9 +197,9 @@ fn run_e2e_test(
     let metadata = calc_metadata(&sierra_program, metadata_config.clone()).unwrap();
 
     // Compile to casm.
-    let casm = cairo_lang_sierra_to_casm::compiler::compile(&sierra_program, &metadata, true)
-        .unwrap()
-        .to_string();
+    let cairo_program = cairo_lang_sierra_to_casm::compiler::compile(&sierra_program, &metadata, true)
+        .unwrap();
+    let casm = cairo_program.to_string();
 
     let mut res: OrderedHashMap<String, String> =
         OrderedHashMap::from([("casm".into(), casm), ("sierra_code".into(), sierra_program_str)]);
@@ -226,6 +227,9 @@ fn run_e2e_test(
             .join("\n");
         res.insert("function_costs".into(), function_costs_str.to_string());
     }
+
+    let lean_soundness = generate_lean_soundness(inputs["test_name"].as_str(), &cairo_program);
+    res.insert("lean_soundness".into(), lean_soundness);
 
     TestRunnerResult::success(res)
 }
