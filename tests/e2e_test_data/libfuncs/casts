@@ -28,6 +28,12 @@ return([2]);
 
 test::foo@0([0]: u16) -> (u64);
 
+//! > test_name
+u16 to u64 upcast
+
+//! > lean_soundness
+-- Could not find lean info.
+
 //! > ==========================================================================
 
 //! > u64 to u16 downcast
@@ -94,3 +100,16 @@ rename<core::option::Option::<core::integer::u16>>([7]) -> ([11]);
 return([10], [11]);
 
 test::foo@0([0]: RangeCheck, [1]: u64) -> (RangeCheck, core::option::Option::<core::integer::u16>);
+
+//! > test_name
+u64 to u16 downcast
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64 (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u64 (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true

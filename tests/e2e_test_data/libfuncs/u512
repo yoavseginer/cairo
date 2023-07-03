@@ -215,3 +215,16 @@ return([4], [5]);
 
 test::foo@0([0]: RangeCheck, [1]: core::integer::u512, [2]: NonZero<core::integer::u256>) -> (RangeCheck, Tuple<core::integer::u512, core::integer::u256>);
 core::integer::U128MulGuaranteeDestruct::destruct@25([0]: RangeCheck, [1]: U128MulGuarantee) -> (RangeCheck, Unit);
+
+//! > test_name
+u512_safe_divmod_by_u256 libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u512_safe_divmod_by_u256_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u512_safe_divmod_by_u256 (mem : F → F) (κ : ℕ) (range_check dividend0 dividend1 dividend2 dividend3 divisor0 divisor1 ρ_range_check ρ_quotient0 ρ_quotient1 ρ_quotient2 ρ_quotient3 ρ_remainder0 ρ_remainder1 ρ_quotient0 ρ_divisor0 ρ_q0d0_high ρ_q0d0_low ρ_quotient0 ρ_divisor1 ρ_q0d1_high ρ_q0d1_low ρ_quotient1 ρ_divisor0 ρ_q1d0_high ρ_q1d0_low ρ_quotient1 ρ_divisor1 ρ_q1d1_high ρ_q1d1_low ρ_quotient2 ρ_divisor0 ρ_q2d0_high ρ_q2d0_low : F) : Prop :=
+  true
+
+def auto_spec_u512_safe_divmod_by_u256 (mem : F → F) (κ : ℕ) (range_check dividend0 dividend1 dividend2 dividend3 divisor0 divisor1 ρ_range_check ρ_quotient0 ρ_quotient1 ρ_quotient2 ρ_quotient3 ρ_remainder0 ρ_remainder1 ρ_quotient0 ρ_divisor0 ρ_q0d0_high ρ_q0d0_low ρ_quotient0 ρ_divisor1 ρ_q0d1_high ρ_q0d1_low ρ_quotient1 ρ_divisor0 ρ_q1d0_high ρ_q1d0_low ρ_quotient1 ρ_divisor1 ρ_q1d1_high ρ_q1d1_low ρ_quotient2 ρ_divisor0 ρ_q2d0_high ρ_q2d0_low : F) : Prop :=
+  true

@@ -36,6 +36,19 @@ return([2]);
 
 test::foo@0([0]: felt252) -> (Box<felt252>);
 
+//! > test_name
+into_box libfunc for felt252 (size 1)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .into_box_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_into_box (mem : F → F) (κ : ℕ) (cell ρ_addr : F) : Prop :=
+  true
+
+def auto_spec_into_box (mem : F → F) (κ : ℕ) (cell ρ_addr : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > unbox libfunc for felt252 (size 1)
@@ -69,6 +82,12 @@ store_temp<felt252>([1]) -> ([2]);
 return([2]);
 
 test::foo@0([0]: Box<felt252>) -> (felt252);
+
+//! > test_name
+unbox libfunc for felt252 (size 1)
+
+//! > lean_soundness
+-- Could not find lean info.
 
 //! > ==========================================================================
 
@@ -112,6 +131,19 @@ return([2]);
 
 test::foo@0([0]: core::integer::u256) -> (Box<core::integer::u256>);
 
+//! > test_name
+into_box libfunc for u256 (size 2)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .into_box_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_into_box (mem : F → F) (κ : ℕ) (cell cell ρ_addr : F) : Prop :=
+  true
+
+def auto_spec_into_box (mem : F → F) (κ : ℕ) (cell cell ρ_addr : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > unbox libfunc for u256 (size 2)
@@ -147,6 +179,12 @@ store_temp<core::integer::u256>([1]) -> ([2]);
 return([2]);
 
 test::foo@0([0]: Box<core::integer::u256>) -> (core::integer::u256);
+
+//! > test_name
+unbox libfunc for u256 (size 2)
+
+//! > lean_soundness
+-- Could not find lean info.
 
 //! > ==========================================================================
 
@@ -186,6 +224,19 @@ return([2]);
 
 test::foo@0() -> (Box<Unit>);
 
+//! > test_name
+into_box libfunc for unit type (size 0)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .into_box_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_into_box (mem : F → F) (κ : ℕ) (ρ_addr : F) : Prop :=
+  true
+
+def auto_spec_into_box (mem : F → F) (κ : ℕ) (ρ_addr : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > unbox libfunc for unit type (size 0)
@@ -218,6 +269,12 @@ store_temp<Unit>([1]) -> ([2]);
 return([2]);
 
 test::foo@0([0]: Box<Unit>) -> (Unit);
+
+//! > test_name
+unbox libfunc for unit type (size 0)
+
+//! > lean_soundness
+-- Could not find lean info.
 
 //! > ==========================================================================
 
@@ -258,6 +315,19 @@ return([2]);
 
 test::foo@0() -> (Box<test::Empty>);
 
+//! > test_name
+into_box libfunc for empty struct (size 0)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .into_box_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_into_box (mem : F → F) (κ : ℕ) (ρ_addr : F) : Prop :=
+  true
+
+def auto_spec_into_box (mem : F → F) (κ : ℕ) (ρ_addr : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > unbox libfunc for empty struct (size 0)
@@ -291,3 +361,9 @@ store_temp<test::Empty>([1]) -> ([2]);
 return([2]);
 
 test::foo@0([0]: Box<test::Empty>) -> (test::Empty);
+
+//! > test_name
+unbox libfunc for empty struct (size 0)
+
+//! > lean_soundness
+-- Could not find lean info.

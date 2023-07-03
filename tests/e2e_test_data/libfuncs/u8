@@ -61,6 +61,19 @@ return([11], [12]);
 
 test::foo@0([0]: RangeCheck, [1]: u8, [2]: u8) -> (RangeCheck, core::result::Result::<core::integer::u8, core::integer::u8>);
 
+//! > test_name
+u8_overflowing_add libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_overflowing_add_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_overflowing_add (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u8_overflowing_add (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u8_overflowing_sub libfunc
@@ -125,6 +138,19 @@ return([11], [12]);
 
 test::foo@0([0]: RangeCheck, [1]: u8, [2]: u8) -> (RangeCheck, core::result::Result::<core::integer::u8, core::integer::u8>);
 
+//! > test_name
+u8_overflowing_sub libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_overflowing_sub_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_overflowing_sub (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u8_overflowing_sub (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u8_eq libfunc (a deref, b deref)
@@ -177,6 +203,19 @@ rename<core::bool>([4]) -> ([7]);
 return([7]);
 
 test::foo@0([0]: u8, [1]: u8) -> (core::bool);
+
+//! > test_name
+u8_eq libfunc (a deref, b deref)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_eq_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
+
+def auto_spec_u8_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
 
 //! > ==========================================================================
 
@@ -237,6 +276,19 @@ rename<core::bool>([4]) -> ([7]);
 return([7]);
 
 test::foo@0() -> (core::bool);
+
+//! > test_name
+u8_eq libfunc (a immediate, b immediate)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_eq_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
+
+def auto_spec_u8_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
 
 //! > ==========================================================================
 
@@ -321,6 +373,19 @@ return([10], [11]);
 
 test::foo@0([0]: RangeCheck, [1]: felt252) -> (RangeCheck, core::option::Option::<core::integer::u8>);
 
+//! > test_name
+u8_try_from_felt252 libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_try_from_felt252_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_try_from_felt252 (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u8_try_from_felt252 (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u8_is_zero libfunc
@@ -374,6 +439,19 @@ return([5]);
 
 test::foo@0([0]: u8) -> (u8);
 
+//! > test_name
+u8_is_zero libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_is_zero_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_is_zero (mem : F → F) (κ : ℕ) (value : F) : Prop :=
+  true
+
+def auto_spec_u8_is_zero (mem : F → F) (κ : ℕ) (value : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u8_safe_divmod libfunc
@@ -422,6 +500,19 @@ return([7], [8]);
 
 test::foo@0([0]: RangeCheck, [1]: u8, [2]: NonZero<u8>) -> (RangeCheck, Tuple<u8, u8>);
 
+//! > test_name
+u8_safe_divmod libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_safe_divmod_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_safe_divmod (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_q ρ_r : F) : Prop :=
+  true
+
+def auto_spec_u8_safe_divmod (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_q ρ_r : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u8_sqrt libfunc
@@ -469,3 +560,16 @@ store_temp<u8>([3]) -> ([5]);
 return([4], [5]);
 
 test::foo@0([0]: RangeCheck, [1]: u8) -> (RangeCheck, u8);
+
+//! > test_name
+u8_sqrt libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u8_sqrt_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u8_sqrt (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_root : F) : Prop :=
+  true
+
+def auto_spec_u8_sqrt (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_root : F) : Prop :=
+  true

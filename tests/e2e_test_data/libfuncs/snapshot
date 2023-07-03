@@ -55,6 +55,12 @@ return([2]);
 test::foo@0([0]: Array<felt252>) -> (Array<felt252>);
 test::bar@6([0]: Snapshot<Array<felt252>>) -> (Unit);
 
+//! > test_name
+Array snapshot.
+
+//! > lean_soundness
+-- Could not find lean info.
+
 //! > ==========================================================================
 
 //! > struct snapshot.
@@ -143,6 +149,12 @@ return([3]);
 
 test::foo@0([0]: Snapshot<test::A>) -> (Snapshot<test::A>);
 test::bar@18([0]: Snapshot<Array<felt252>>, [1]: felt252) -> (Unit);
+
+//! > test_name
+struct snapshot.
+
+//! > lean_soundness
+-- Could not find lean info.
 
 //! > ==========================================================================
 
@@ -239,3 +251,16 @@ return([8]);
 test::bar0@0([0]: Snapshot<Array<felt252>>) -> (Unit);
 test::bar1@4([0]: felt252) -> (Unit);
 test::foo@8([0]: Snapshot<test::A>) -> (Snapshot<test::A>);
+
+//! > test_name
+enum snapshot.
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .enum_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_enum (mem : F → F) (κ : ℕ) ( : F) : Prop :=
+  true
+
+def auto_spec_enum (mem : F → F) (κ : ℕ) ( : F) : Prop :=
+  true

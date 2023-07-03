@@ -61,6 +61,19 @@ return([11], [12]);
 
 test::foo@0([0]: RangeCheck, [1]: u64, [2]: u64) -> (RangeCheck, core::result::Result::<core::integer::u64, core::integer::u64>);
 
+//! > test_name
+u64_overflowing_add libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_overflowing_add_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_overflowing_add (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u64_overflowing_add (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u64_overflowing_sub libfunc
@@ -125,6 +138,19 @@ return([11], [12]);
 
 test::foo@0([0]: RangeCheck, [1]: u64, [2]: u64) -> (RangeCheck, core::result::Result::<core::integer::u64, core::integer::u64>);
 
+//! > test_name
+u64_overflowing_sub libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_overflowing_sub_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_overflowing_sub (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u64_overflowing_sub (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u64_eq libfunc (a deref, b deref)
@@ -177,6 +203,19 @@ rename<core::bool>([4]) -> ([7]);
 return([7]);
 
 test::foo@0([0]: u64, [1]: u64) -> (core::bool);
+
+//! > test_name
+u64_eq libfunc (a deref, b deref)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_eq_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
+
+def auto_spec_u64_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
 
 //! > ==========================================================================
 
@@ -237,6 +276,19 @@ rename<core::bool>([4]) -> ([7]);
 return([7]);
 
 test::foo@0() -> (core::bool);
+
+//! > test_name
+u64_eq libfunc (a immediate, b immediate)
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_eq_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
+
+def auto_spec_u64_eq (mem : F → F) (κ : ℕ) (a b : F) : Prop :=
+  true
 
 //! > ==========================================================================
 
@@ -321,6 +373,19 @@ return([10], [11]);
 
 test::foo@0([0]: RangeCheck, [1]: felt252) -> (RangeCheck, core::option::Option::<core::integer::u64>);
 
+//! > test_name
+u64_try_from_felt252 libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_try_from_felt252_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_try_from_felt252 (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
+def auto_spec_u64_try_from_felt252 (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_branch_id ρ₀ : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u64_is_zero libfunc
@@ -374,6 +439,19 @@ return([5]);
 
 test::foo@0([0]: u64) -> (u64);
 
+//! > test_name
+u64_is_zero libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_is_zero_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_is_zero (mem : F → F) (κ : ℕ) (value : F) : Prop :=
+  true
+
+def auto_spec_u64_is_zero (mem : F → F) (κ : ℕ) (value : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u64_safe_divmod libfunc
@@ -421,6 +499,19 @@ store_temp<Tuple<u64, u64>>([6]) -> ([8]);
 return([7], [8]);
 
 test::foo@0([0]: RangeCheck, [1]: u64, [2]: NonZero<u64>) -> (RangeCheck, Tuple<u64, u64>);
+
+//! > test_name
+u64_safe_divmod libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_safe_divmod_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_safe_divmod (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_q ρ_r : F) : Prop :=
+  true
+
+def auto_spec_u64_safe_divmod (mem : F → F) (κ : ℕ) (range_check a b ρ_range_check ρ_q ρ_r : F) : Prop :=
+  true
 
 //! > ==========================================================================
 
@@ -470,3 +561,16 @@ store_temp<u32>([3]) -> ([5]);
 return([4], [5]);
 
 test::foo@0([0]: RangeCheck, [1]: u64) -> (RangeCheck, u32);
+
+//! > test_name
+u64_sqrt libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u64_sqrt_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u64_sqrt (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_root : F) : Prop :=
+  true
+
+def auto_spec_u64_sqrt (mem : F → F) (κ : ℕ) (range_check value ρ_range_check ρ_root : F) : Prop :=
+  true

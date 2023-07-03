@@ -145,6 +145,19 @@ return([4], [5]);
 test::foo@0([0]: RangeCheck, [1]: core::integer::u256, [2]: NonZero<core::integer::u256>) -> (RangeCheck, Tuple<core::integer::u256, core::integer::u256>);
 core::integer::U128MulGuaranteeDestruct::destruct@9([0]: RangeCheck, [1]: U128MulGuarantee) -> (RangeCheck, Unit);
 
+//! > test_name
+u256_safe_divmod libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u256_safe_divmod_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u256_safe_divmod (mem : F → F) (κ : ℕ) (range_check dividend0 dividend1 divisor0 divisor1 ρ_range_check ρ_quotient0 ρ_quotient1 ρ_remainder0 ρ_remainder1 ρ_quotient0 ρ_divisor0 ρ_q0d0_high ρ_q0d0_low : F) : Prop :=
+  true
+
+def auto_spec_u256_safe_divmod (mem : F → F) (κ : ℕ) (range_check dividend0 dividend1 divisor0 divisor1 ρ_range_check ρ_quotient0 ρ_quotient1 ρ_remainder0 ρ_remainder1 ρ_quotient0 ρ_divisor0 ρ_q0d0_high ρ_q0d0_low : F) : Prop :=
+  true
+
 //! > ==========================================================================
 
 //! > u256_is_zero libfunc
@@ -206,6 +219,19 @@ rename<core::integer::u256>([5]) -> ([7]);
 return([7]);
 
 test::foo@0([0]: core::integer::u256) -> (core::integer::u256);
+
+//! > test_name
+u256_is_zero libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u256_is_zero_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u256_is_zero (mem : F → F) (κ : ℕ) (x y : F) : Prop :=
+  true
+
+def auto_spec_u256_is_zero (mem : F → F) (κ : ℕ) (x y : F) : Prop :=
+  true
 
 //! > ==========================================================================
 
@@ -290,3 +316,16 @@ store_temp<u128>([3]) -> ([5]);
 return([4], [5]);
 
 test::foo@0([0]: RangeCheck, [1]: core::integer::u256) -> (RangeCheck, u128);
+
+//! > test_name
+u256_sqrt libfunc
+
+//! > lean_soundness
+import starkware.cairo.lean.semantics.soundness.prelude
+import .u256_sqrt_code.lean
+variables {F : Type} [field F] [decidable_eq F]
+def spec_u256_sqrt (mem : F → F) (κ : ℕ) (range_check value_low value_high ρ_range_check ρ_sqrt : F) : Prop :=
+  true
+
+def auto_spec_u256_sqrt (mem : F → F) (κ : ℕ) (range_check value_low value_high ρ_range_check ρ_sqrt : F) : Prop :=
+  true
