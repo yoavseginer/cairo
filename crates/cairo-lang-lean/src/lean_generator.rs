@@ -742,6 +742,13 @@ trait LeanGenerator {
         indent: usize,
     );
 
+    fn generate_call(
+        &mut self,
+        pc: usize,
+        op_size: usize,
+        indent: usize,
+    );
+
     fn generate_jnz(
         &mut self,
         cond_var: &str,
@@ -969,6 +976,15 @@ impl LeanGenerator for AutoSpecs {
     }
 
     fn generate_jmp(
+        &mut self,
+        pc: usize,
+        op_size: usize,
+        indent: usize,
+    ) {
+        // Do nothing.
+    }
+
+    fn generate_call(
         &mut self,
         pc: usize,
         op_size: usize,
@@ -1364,6 +1380,16 @@ impl LeanGenerator for AutoProof {
             codes = self.make_codes(pc, op_size)));
     }
 
+    fn generate_call(
+        &mut self,
+        pc: usize,
+        op_size: usize,
+        indent: usize,
+    ) {
+        self.push_main(indent, &format!("-- handle call here ({codes})",
+            codes = self.make_codes(pc, op_size)));
+    }
+
     fn generate_jnz(
         &mut self,
         cond_var: &str,
@@ -1694,6 +1720,9 @@ fn generate_auto_block(
                 };
                 return; // Remaining code handled already in the branches.
             },
+            StatementDesc::Call(label) => {
+                lean_gen.generate_call(pc, op_size, indent);
+            }
             StatementDesc::Fail => {
                 lean_gen.generate_fail(pc, op_size, indent);
                 return; // Remaining code not reachable.
@@ -1779,12 +1808,13 @@ fn check_supported(test_name: &str, aux_info: &CasmBuilderAuxiliaryInfo, cairo_p
         return false;
     }
 
-    !cairo_program.instructions.iter().any(
-        |instr| match instr.body {
-            InstructionBody::Call(_) => true,
-            _ => false
-         }
-    )
+    return true;
+    // !cairo_program.instructions.iter().any(
+    //     |instr| match instr.body {
+    //         InstructionBody::Call(_) => true,
+    //         _ => false
+    //      }
+    // )
 }
 
 pub fn generate_lean_soundness(test_name: &str, cairo_program: &CairoProgram) -> String {
@@ -1815,6 +1845,7 @@ pub fn generate_lean_soundness(test_name: &str, cairo_program: &CairoProgram) ->
     // Generate the user spec
     soundness.append(generate_soundness_user_spec(&lean_info).as_mut());
     soundness.push(String::from(""));
+
     // Generate the auto spec
     soundness.append(generate_soundness_auto_spec(&lean_info).as_mut());
 
@@ -1822,7 +1853,7 @@ pub fn generate_lean_soundness(test_name: &str, cairo_program: &CairoProgram) ->
     soundness.push(String::from(""));
     soundness.append(generate_user_soundness_theorem(&lean_info).as_mut());
 
-    // Gneerate the soundness proof
+    // Generate the soundness proof
     soundness.push(String::from(""));
     soundness.append(generate_soundness_auto_theorem(&lean_info).as_mut());
 

@@ -715,6 +715,7 @@ pub enum StatementDesc {
     Assert(AssertDesc),
     ApPlus(usize),
     Jump(JumpDesc),
+    Call(String),
     Label(String),
     Fail,
 }
@@ -875,6 +876,10 @@ impl CasmBuilderAuxiliaryInfo {
             target: String::from(label),
             cond_var: Some((String::from(cond_var_name), cond_var)),
         }));
+    }
+
+    pub fn add_call(&mut self, label: &str) {
+        self.statements.push(StatementDesc::Call(String::from(label)));
     }
 
     pub fn add_label(&mut self, label: &str) {
@@ -1304,6 +1309,9 @@ macro_rules! casm_build_extend {
             }));
             __var_index += 1;
         )*
+        if let Some(aux_info) = &mut $builder.aux_info {
+            aux_info.add_call(stringify!($target));
+        }
         $crate::casm_build_extend!($builder, $($tok)*)
     };
     ($builder:ident, ret; $($tok:tt)*) => {
