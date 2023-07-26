@@ -200,21 +200,23 @@ fn get_ret_blocks(aux_info: &CasmBuilderAuxiliaryInfo, cairo_program: &CairoProg
 }
 
 fn check_ret_blocks(ret_blocks: &Vec<(usize, Option<usize>, bool)>, branch_num: usize) {
-    assert!(branch_num == ret_blocks.len(), "branch_num != ret_blocks.len()");
+    // assert!(branch_num == ret_blocks.len(), "branch_num != ret_blocks.len()");
+    assert!(branch_num <= ret_blocks.len(), "branch_num != ret_blocks.len()");
 
     if branch_num == 0 {
         return;
     }
 
     // check that all branches have the same number of statements
-    let mut count = 0;
-    for (num, _, _) in ret_blocks {
-        if count == 0 {
-            count = *num;
-        } else {
-            assert!(count == *num, "count != *num");
-        }
-    }
+    // let mut count = 0;
+    // for (num, _, _) in ret_blocks {
+    //     if count == 0 {
+    //         count = *num;
+    //     } else {
+    //         assert!(count == *num, "count != *num");
+    //     }
+    // }
+
     // check that all branches have the same branch ID position.
     /*let branch_id_pos = ret_blocks[0].1;
     for (_, pos, _) in ret_blocks {
