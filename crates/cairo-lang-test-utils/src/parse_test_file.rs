@@ -321,6 +321,7 @@ pub fn run_test_file(
     let filename = path.file_name().unwrap().to_str().unwrap();
     let is_fix_mode = std::env::var("CAIRO_FIX_TESTS") == Ok("1".into());
     let gen_lean_mode = std::env::var("CAIRO_GEN_LEAN") == Ok("1".into());
+    let is_lean3_version: bool = std::env::var("CAIRO_LEAN_VERSION") == Ok("3".into());
     let tests = parse_test_file(path)?;
     let mut new_tests = OrderedHashMap::<String, Test>::default();
 
@@ -366,7 +367,7 @@ pub fn run_test_file(
         let result = runner.run(&test.attributes, &runner_args);
 
         if gen_lean_mode {
-            write_lean_soundness_file(&path, &test_name, outputs.get("lean_soundness"))?;
+            write_lean_soundness_file(&path, &test_name, outputs.get("lean_soundness"), is_lean3_version)?;
         }
 
         // Fix if in fix mode, unrelated to the result.
