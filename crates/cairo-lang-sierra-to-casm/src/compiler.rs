@@ -100,8 +100,12 @@ pub struct SierraToCasmConfig {
 pub struct CairoProgram {
     pub instructions: Vec<Instruction>,
     pub debug_info: CairoProgramDebugInfo,
+<<<<<<< HEAD
     pub consts_info: ConstsInfo,
     pub aux_info: Option<CasmBuilderAuxiliaryInfo>,
+=======
+    pub aux_infos: Vec<CasmBuilderAuxiliaryInfo>,
+>>>>>>> 38279a0de... WIP: first steps in handling guarantee destructors in libfunc tests.
 }
 impl Display for CairoProgram {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -465,7 +469,7 @@ pub fn compile(
         CircuitsInfo::new(&registry, program.type_declarations.iter().map(|td| &td.id))?;
 
     let mut program_offset: usize = 0;
-    let mut last_aux_info: Option<CasmBuilderAuxiliaryInfo> = None;
+    let mut aux_infos: Vec<CasmBuilderAuxiliaryInfo> = Vec::new();
 
     for (statement_id, statement) in program.statements.iter().enumerate() {
         let statement_idx = StatementIdx(statement_id);
@@ -557,9 +561,9 @@ pub fn compile(
 
                 let start_offset = program_offset;
                 if let Some(mut aux_info) = compiled_invocation.aux_info {
-                    if last_aux_info == None && aux_info.not_empty() {
+                    if aux_info.not_empty() {
                         aux_info.finalize(compiled_invocation.instructions.len());
-                        last_aux_info = Some(aux_info);
+                        aux_infos.push(aux_info);
                     }
                 }
 
@@ -651,7 +655,7 @@ pub fn compile(
         instructions,
         consts_info,
         debug_info: CairoProgramDebugInfo { sierra_statement_info },
-        aux_info: last_aux_info,
+        aux_infos: aux_infos,
     })
 }
 
