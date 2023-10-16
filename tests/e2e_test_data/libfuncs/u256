@@ -284,6 +284,9 @@ return([2], [3]); // 3
 
 test::foo@0([0]: RangeCheck, [1]: core::integer::u256) -> (RangeCheck, u128);
 
+//! > test_name
+u256_sqrt libfunc
+
 //! > ==========================================================================
 
 //! > u256_guarantee_inv_mod_n libfunc
@@ -294,11 +297,38 @@ test::foo@0([0]: RangeCheck, [1]: core::integer::u256) -> (RangeCheck, u128);
 SmallE2ETestRunner
 
 //! > cairo
-fn foo(b: u256, n: NonZero<u256>) -> Option<NonZero<u256>> {
-    match math::u256_guarantee_inv_mod_n(b, n) {
-        Result::Ok((r, _, _, _, _, _, _, _, _)) => Option::Some(r),
-        Result::Err(_) => Option::None(()),
-    }
+extern type U128MulGuarantee;
+extern fn u256_guarantee_inv_mod_n(
+    b: u256, n: NonZero<u256>
+) -> Result<
+    (
+        NonZero<u256>,
+        U128MulGuarantee,
+        U128MulGuarantee,
+        U128MulGuarantee,
+        U128MulGuarantee,
+        U128MulGuarantee,
+        U128MulGuarantee,
+        U128MulGuarantee,
+        U128MulGuarantee
+    ),
+    (U128MulGuarantee, U128MulGuarantee)
+> implicits(RangeCheck) nopanic;
+
+fn foo(b: u256, n: NonZero<u256>) -> Result<
+(
+    NonZero<u256>,
+    U128MulGuarantee,
+    U128MulGuarantee,
+    U128MulGuarantee,
+    U128MulGuarantee,
+    U128MulGuarantee,
+    U128MulGuarantee,
+    U128MulGuarantee,
+    U128MulGuarantee
+),
+(U128MulGuarantee, U128MulGuarantee)> {
+    u256_guarantee_inv_mod_n(b, n)
 }
 
 //! > casm
@@ -473,34 +503,38 @@ call rel 9;
 [ap + 0] = 1, ap++;
 [ap + 0] = 0, ap++;
 [ap + 0] = 0, ap++;
-ret;
-%{ (memory[ap + 1], memory[ap + 0]) = divmod(memory[fp + -6], 18446744073709551616) %}
-[ap + 2] = [ap + 0] + 340282366920938463444927863358058659840, ap++;
-[ap + 1] = [[fp + -7] + 0], ap++;
-[ap + -2] = [[fp + -7] + 1], ap++;
-[ap + -2] = [[fp + -7] + 2];
-[ap + 0] = [ap + -2] * 18446744073709551616, ap++;
-[fp + -6] = [ap + -1] + [ap + -4];
-[ap + 0] = [ap + -4] * [fp + -5], ap++;
-[ap + 0] = [ap + -4] * [fp + -5], ap++;
-%{ (memory[ap + 0], memory[ap + 1]) = divmod(memory[ap + -1], 18446744073709551616) %}
-[ap + 2] = [ap + 1] + 340282366920938463444927863358058659840, ap++;
-[ap + 1] = [[fp + -7] + 3], ap++;
-[ap + -1] = [[fp + -7] + 4], ap++;
-[ap + -3] = [[fp + -7] + 5];
-[ap + 0] = [ap + -3] * 18446744073709551616, ap++;
-[ap + -5] = [ap + -1] + [ap + -3];
-[ap + 0] = [ap + -3] * 18446744073709551616, ap++;
-[ap + 3] = [ap + -7] + [ap + -1], ap++;
-%{ (memory[ap + -1], memory[fp + -3]) = divmod(memory[ap + 2], 340282366920938463463374607431768211456) %}
-[ap + 0] = [ap + -1] + 340282366920938463426481119284349108224, ap++;
-[ap + -1] = [[fp + -7] + 6], ap++;
-[ap + -3] = [[fp + -7] + 7], ap++;
-[fp + -3] = [[fp + -7] + 8];
-[ap + -2] = [ap + -4] * 340282366920938463463374607431768211456;
-[ap + -1] = [ap + -2] + [fp + -3];
-[fp + -4] = [ap + -9] + [ap + -4];
-[ap + 0] = [fp + -7] + 9, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = 0, ap++;
+[ap + 0] = [ap + -74], ap++;
+[ap + 0] = [ap + -73], ap++;
+[ap + 0] = [ap + -69], ap++;
+[ap + 0] = [fp + -6], ap++;
+[ap + 0] = [ap + -78], ap++;
+[ap + 0] = [ap + -75], ap++;
+[ap + 0] = [ap + -72], ap++;
+[ap + 0] = [fp + -4], ap++;
 ret;
 
 //! > function_costs
@@ -509,15 +543,18 @@ core::integer::U128MulGuaranteeDestruct::destruct: OrderedHashMap({Const: 3030})
 
 //! > sierra_code
 type RangeCheck = RangeCheck [storable: true, drop: false, dup: false, zero_sized: false];
+type U128MulGuarantee = U128MulGuarantee [storable: true, drop: false, dup: false, zero_sized: false];
+type Tuple<U128MulGuarantee, U128MulGuarantee> = Struct<ut@Tuple, U128MulGuarantee, U128MulGuarantee> [storable: true, drop: false, dup: false, zero_sized: false];
 type u128 = u128 [storable: true, drop: true, dup: true, zero_sized: false];
 type core::integer::u256 = Struct<ut@core::integer::u256, u128, u128> [storable: true, drop: true, dup: true, zero_sized: false];
 type NonZero<core::integer::u256> = NonZero<core::integer::u256> [storable: true, drop: true, dup: true, zero_sized: false];
-type Unit = Struct<ut@Tuple> [storable: true, drop: true, dup: true, zero_sized: true];
-type core::option::Option::<core::zeroable::NonZero::<core::integer::u256>> = Enum<ut@core::option::Option::<core::zeroable::NonZero::<core::integer::u256>>, NonZero<core::integer::u256>, Unit> [storable: true, drop: true, dup: true, zero_sized: false];
-type U128MulGuarantee = U128MulGuarantee [storable: true, drop: false, dup: false, zero_sized: false];
+type Tuple<NonZero<core::integer::u256>, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee> = Struct<ut@Tuple, NonZero<core::integer::u256>, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee> [storable: true, drop: false, dup: false, zero_sized: false];
+type core::result::Result::<(core::zeroable::NonZero::<core::integer::u256>, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee), (test::U128MulGuarantee, test::U128MulGuarantee)> = Enum<ut@core::result::Result::<(core::zeroable::NonZero::<core::integer::u256>, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee), (test::U128MulGuarantee, test::U128MulGuarantee)>, Tuple<NonZero<core::integer::u256>, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee>, Tuple<U128MulGuarantee, U128MulGuarantee>> [storable: true, drop: false, dup: false, zero_sized: false];
 
 libfunc u256_guarantee_inv_mod_n = u256_guarantee_inv_mod_n;
 libfunc branch_align = branch_align;
+libfunc struct_construct<Tuple<NonZero<core::integer::u256>, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee>> = struct_construct<Tuple<NonZero<core::integer::u256>, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee, U128MulGuarantee>>;
+libfunc enum_init<core::result::Result::<(core::zeroable::NonZero::<core::integer::u256>, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee), (test::U128MulGuarantee, test::U128MulGuarantee)>, 0> = enum_init<core::result::Result::<(core::zeroable::NonZero::<core::integer::u256>, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee, test::U128MulGuarantee), (test::U128MulGuarantee, test::U128MulGuarantee)>, 0>;
 libfunc store_temp<RangeCheck> = store_temp<RangeCheck>;
 libfunc store_temp<U128MulGuarantee> = store_temp<U128MulGuarantee>;
 libfunc function_call<user@core::integer::U128MulGuaranteeDestruct::destruct> = function_call<user@core::integer::U128MulGuaranteeDestruct::destruct>;
