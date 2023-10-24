@@ -1118,7 +1118,6 @@ macro_rules! casm_build_extend {
     };
     ($builder:ident, assert $dst:ident = * $buffer:ident; $($tok:tt)*) => {
         {
-            let __deref = $builder.double_deref($buffer, 0);
             let dst_expr = $builder.get_value($dst, false);
             let buffer_expr = $builder.get_value($buffer, false);
             let ap_change = $builder.get_ap_change();
@@ -1132,12 +1131,12 @@ macro_rules! casm_build_extend {
                     ap_change,
                 );
             }
+            let __deref = $builder.double_deref($buffer, 0);
             $builder.assert_vars_eq($dst, __deref);
         }
         $crate::casm_build_extend!($builder, $($tok)*)
     };
     ($builder:ident, assert $value:ident = * ( $buffer:ident ++ ); $($tok:tt)*) => {
-        $builder.buffer_write_and_inc($buffer, $value);
         {
             let value_expr = $builder.get_value($value, false);
             let buffer_expr = $builder.get_value($buffer, false);
@@ -1151,17 +1150,9 @@ macro_rules! casm_build_extend {
                     None,
                     ap_change,
                 );
-                // Currently, we do not create intermediate variables for these steps,
-                // but this may change in the future.
-                /*aux_info.add_let(
-                    aux_info.make_var_desc(stringify!($buffer), $buffer, buffer_expr),
-                    &format!("{} + 1", stringify!($buffer)),
-                    aux_info.make_var_desc(stringify!($buffer), $buffer, buffer_expr),
-                    "++",
-                    None,
-                );*/
             }
         }
+        $builder.buffer_write_and_inc($buffer, $value);
         $crate::casm_build_extend!($builder, $($tok)*)
     };
     ($builder:ident, tempvar $var:ident = $value:ident; $($tok:tt)*) => {
@@ -1328,9 +1319,10 @@ macro_rules! casm_build_extend {
         $crate::casm_build_extend!($builder, $($tok)*)
     };
     ($builder:ident, let $dst:ident = *$buffer:ident; $($tok:tt)*) => {
+        // record the expression before the offset is advanced.
+        let buffer_expr = $builder.get_value($buffer, false);
         let $dst = $builder.double_deref($buffer, 0);
         let dst_expr = $builder.get_value($dst, false);
-        let buffer_expr = $builder.get_value($buffer, false);
         let ap_change = $builder.get_ap_change();
         if let Some(aux_info) = &mut $builder.aux_info {
             aux_info.add_let(
