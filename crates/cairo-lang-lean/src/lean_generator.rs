@@ -24,7 +24,11 @@ use cairo_lang_sierra_to_casm::compiler::CairoProgram;
 use cairo_lang_utils::bigint::BigIntAsHex;
 
 pub fn func_name_from_test_name(test_name: &str) -> String {
-    if let Some((prefix, suffix)) = test_name.rsplit_once(' ') {
+    if test_name.contains('_') {
+        // If the test name contains underscores, we assume that all parts of teh function
+        // name are connected by underscores.
+        test_name.split_whitespace().next().unwrap().to_string()
+    } else if let Some((prefix, suffix)) = test_name.rsplit_once(' ') {
         if suffix == "libfunc" {
             prefix.replace(" ", "_")
         } else {
