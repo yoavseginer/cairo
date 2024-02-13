@@ -11,6 +11,8 @@ use colored::Colorize;
 use cairo_lang_lean::lean_generator::{
     write_lean_soundness_spec_file,
     write_lean_soundness_file,
+    write_lean_completeness_spec_file,
+    write_lean_completeness_file,
     write_lean_code_file,
 };
 
@@ -326,7 +328,13 @@ pub fn run_test_file(
     let is_fix_mode = std::env::var("CAIRO_FIX_TESTS") == Ok("1".into());
     let gen_lean_mode = std::env::var("CAIRO_GEN_LEAN") == Ok("1".into());
     let is_lean3_version: bool = std::env::var("CAIRO_LEAN_VERSION") == Ok("3".into());
-    let lean_outputs = vec!("lean_soundness_spec", "lean_soundness", "lean_code");
+    let lean_outputs = vec!(
+        "lean_soundness_spec",
+        "lean_soundness",
+        "lean_completenessness_spec",
+        "lean_completeness",
+        "lean_code",
+    );
     let tests = parse_test_file(path)?;
     let mut new_tests = OrderedHashMap::<String, Test>::default();
 
@@ -374,6 +382,8 @@ pub fn run_test_file(
         if gen_lean_mode {
             write_lean_soundness_spec_file(&path, &test_name, result.outputs.get("lean_soundness_spec"))?;
             write_lean_soundness_file(&path, &test_name, result.outputs.get("lean_soundness"))?;
+            write_lean_completeness_spec_file(&path, &test_name, result.outputs.get("lean_completeness_spec"))?;
+            write_lean_completeness_file(&path, &test_name, result.outputs.get("lean_completeness"))?;
             write_lean_code_file(&path, &test_name, result.outputs.get("lean_code"), is_lean3_version)?;
         }
 
