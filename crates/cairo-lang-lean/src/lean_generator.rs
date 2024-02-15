@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use cairo_lang_casm::cell_expression::{CellExpression, CellOperator};
 use itertools::Itertools;
 use num_bigint::BigInt;
+use num_traits::cast::ToPrimitive;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -562,15 +563,8 @@ fn get_ref_from_deref(expr: &CellExpression) -> Option<(String, i16)> {
 /// instruction.
 fn ap_step_from_instruction(instr: &AddApInstruction) -> usize {
     match &instr.operand {
-        ResOperand::Immediate(value) => {
-            let in_radix = value.value.to_radix_le(10);
-            let mut as_usize = 0;
-            for (pos, val) in in_radix.1.iter().enumerate() {
-                assert!(as_usize < usize::MAX / 10, "AP step larger than max usize.");
-                as_usize = as_usize * 10 + (*val as usize);
-            }
-            as_usize
-        },
+        ResOperand::Immediate(value) =>
+            value.value.to_usize().expect("ap step should be a usize value."),
         _ => panic!("Expected an immediate value in ap advance instruction")
     }
 }
