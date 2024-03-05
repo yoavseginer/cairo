@@ -851,8 +851,9 @@ impl<'a> LeanFuncInfo<'a> {
     /// Given a variable name, returns the VM type of that variable. This is 'val'
     /// for all variables except the rc pointer, which is 'rc'.
     pub fn get_vm_var_type(&self, name: &str) -> String {
+        let base_name: String = name.strip_prefix("ρ_").unwrap_or(name).into();
         if let Some(rc_ptr) = self.get_range_check_arg_name() {
-            if rc_ptr == name {
+            if rc_ptr == base_name {
                 "rc".into()
             } else {
                 "val".into()
@@ -973,7 +974,7 @@ impl<'a> LeanFuncInfo<'a> {
             }
         }
 
-        None
+        Some(BigInt::from(0))
     }
 
     // True if this expression increments the range check pointer.
@@ -1391,8 +1392,8 @@ fn generate_soundness_prelude4(main_func_name: &str) -> Vec<String> {
     let mut prelude: Vec<String> = Vec::new();
     prelude.push(String::from("import Verification.Semantics.Soundness.Prelude"));
     prelude.push(String::from("import Verification.Libfuncs.Common"));
-    prelude.push(format!("import Verification.Libfuncs.uXX.{}", lean_soundness_spec_file_name(main_func_name, false)));
-    prelude.push(format!("import Verification.Libfuncs.uXX.{}", lean_code_file_name(main_func_name, false)));
+    prelude.push(format!("import Verification.Libfuncs.XXX.{}", lean_soundness_spec_file_name(main_func_name, false)));
+    prelude.push(format!("import Verification.Libfuncs.XXX.{}", lean_code_file_name(main_func_name, false)));
     prelude.push(String::from(""));
     prelude.push(String::from("open Tactic"));
     prelude.push(String::from("set_option autoImplicit false"));
@@ -1427,8 +1428,8 @@ fn generate_completeness_prelude(main_func_name: &str) -> Vec<String> {
 
     prelude.push(String::from("import Verification.Semantics.Soundness.Prelude"));
     prelude.push(String::from("import Verification.Libfuncs.Common"));
-    prelude.push(format!("import Verification.Libfuncs.uXX.{}", lean_completeness_spec_file_name(main_func_name, false)));
-    prelude.push(format!("import Verification.Libfuncs.uXX.{}", lean_code_file_name(main_func_name, false)));
+    prelude.push(format!("import Verification.Libfuncs.XXX.{}", lean_completeness_spec_file_name(main_func_name, false)));
+    prelude.push(format!("import Verification.Libfuncs.XXX.{}", lean_code_file_name(main_func_name, false)));
     prelude.push(String::from(""));
     prelude.push(String::from("open Tactic"));
     prelude.push(String::from("open Mrel"));
@@ -2942,16 +2943,16 @@ impl CompletenessProof {
         if block.ap_offset == 0 { "σ.ap".into() } else { format!("(σ.ap + {})", block.ap_offset) }
     }
 
-    fn make_start_rc_expr(&self, lean_info: &LeanFuncInfo, block: &FuncBlock) -> String {
+    fn make_start_rc_expr(&self, lean_info: &LeanFuncInfo, block: &FuncBlock, explicit_zero_offset: bool) -> String {
         let rc_name = lean_info.get_range_check_arg_name();
         if let Some(rc_name) = rc_name {
-            if block.start_rc == 0 {
+            if !explicit_zero_offset && block.start_rc == 0 {
                 rc_name
             } else {
                 format!("({} + {})", rc_name, block.start_rc)
             }
         } else {
-            "(0 : ℕ)".into()
+            "(0 : ℤ)".into()
         }
     }
 
@@ -3014,7 +3015,10 @@ impl CompletenessProof {
     ) {
         // Create the ap and rc memory offsets expressions for the beginning of the block.
         let ap_expr = self.make_start_ap_expr(block);
-        let rc_expr = self.make_start_rc_expr(lean_info, block);
+        // When the offset is zero, and this is not the main block, we sometimes need the zero offset to appear explicitly
+        // and sometimes not (as the + 0 is sometimes simplified away).
+        let rc_expr_explicit_offset = self.make_start_rc_expr(lean_info, block, block.pc_start_pos != 0);
+        let rc_expr = self.make_start_rc_expr(lean_info, block, false);
         let start_state = if block.pc_start_pos == 0 {
                 "σ".into()
             } else {
@@ -3023,20 +3027,26 @@ impl CompletenessProof {
 
         // Conclusion
         self.push_statement(indent, "-- conclusion");
-        self.push_statement(indent, &format!(": ∃ loc : LocalAssignment {ap_expr} {rc_expr},"));
+        self.push_statement(indent, &format!(": ∃ loc : LocalAssignment {ap_expr} {rc_expr_explicit_offset},"));
 
         let indent = indent + 2;
 
-        self.push_statement(indent, &format!("VmRangeChecked loc.rc_vals {rc_expr} loc.rc_num u128Limit ∧"));
+        self.push_statement(indent, &format!("VmRangeChecked loc.rc_vals {rc_expr_explicit_offset} loc.rc_num u128Limit ∧"));
         self.push_statement(indent, &format!("Returns PRIME (Assign mem loc) {start_state} (fun κ τ =>"));
 
         let indent = indent + 2;
 
-        self.push_statement(indent, &format!("τ.ap = {ap_expr} + loc.exec_num ∧"));
-        self.push_statement(
-            indent,
-            &format!("Assign mem loc (exec (τ.ap - 3)) = rc ({rc_expr} + loc.rc_num)) := by")
-        );
+        if let Some(rc_name) = lean_info.get_range_check_arg_name() {
+            self.push_statement(indent, &format!("τ.ap = {ap_expr} + loc.exec_num ∧"));
+            self.push_statement(
+                indent,
+                &format!("Assign mem loc (exec (τ.ap - {num_ret})) = rc ({rc_expr} + loc.rc_num)) := by",
+                    num_ret = lean_info.get_ret_arg_offset(&rc_name).expect("Failed to find rc return arg offset."),
+                ),
+            );
+        } else {
+            self.push_statement(indent, &format!("τ.ap = {ap_expr} + loc.exec_num"));
+        }
     }
 
     /// To be used for variables allocated on the stack. Not for let variables.
@@ -3058,7 +3068,7 @@ impl CompletenessProof {
         let (var_name, expr) = rebind_var_assignment(var, rebind);
         let (_, var_offset) = get_ref_from_deref(&var.var_expr).expect("Failed to find var offset");
 
-        // xxxxxxx below, should use the var_offset instead of guessing the location.
+        // TODO: Below, should use the var_offset instead of guessing the location.
         // Moreover, local variable assignment is problematic here (because it can be before
         // the beginning of the block start ap).
         let ap_pos = if !is_local {
@@ -3078,23 +3088,12 @@ impl CompletenessProof {
 
         self.spec_rcases.push(var_name.clone());
         if let Some(expr) = &var.expr {
-            self.spec_rcases.push(format!("h_{var_name}"));
-            // TODO: code below duplicated at other calls to generate_assert_main().
-            let rhs_var_a = if let Some((_, var_a_offset)) = get_ref_from_deref(&expr.var_a.var_expr) {
-                Some((expr.var_a.name.clone(), var_a_offset))
-            } else {
-                None
-            };
-            let rhs_var_b = match &expr.var_b {
-                    Some(var_b) =>
-                        if let Some((_, var_b_offset)) = get_ref_from_deref(&var_b.var_expr) {
-                            Some((var_b.name.clone(), var_b_offset))
-                        } else {
-                            None
-                        },
-                    _ => None
-                };
+            let assert_hyp = format!("h_{var_name}");
+            self.spec_rcases.push(assert_hyp.clone());
+            let (rhs_var_a, rhs_var_b, simps) =
+                CompletenessProof::get_rhs_vars_and_simps(&expr, lean_info, &assert_hyp);
             self.generate_assert_main(
+                lean_info,
                 block,
                 &var.name,
                 get_ref_from_deref(&var.var_expr).expect("Failed to find variable AP offset").1,
@@ -3102,6 +3101,8 @@ impl CompletenessProof {
                 rhs_var_b,
                 String::from("+-*/").find(&expr.op).is_some(),
                 None,
+                &assert_hyp,
+                Some(&simps),
                 pc,
                 op_size,
                 indent
@@ -3130,8 +3131,49 @@ impl CompletenessProof {
         }
     }
 
+    /// Generates the description of the rhs variables of an assert or variable assignment. Also generates
+    /// any special simplifications that need to be applied to the assert hypothesis for this expression.
+    fn get_rhs_vars_and_simps(
+        expr: &ExprDesc,
+        lean_info: &LeanFuncInfo,
+        assert_hyp: &str,
+    ) -> (Option<(String, i16)>, Option<(String, i16)>, Vec<String>) {
+
+        let rhs_var_a = if let Some((_, var_a_offset)) = get_ref_from_deref(&expr.var_a.var_expr) {
+            Some((expr.var_a.name.clone(), var_a_offset))
+        } else {
+            None
+        };
+        let rhs_var_b = match &expr.var_b {
+                Some(var_b) =>
+                    if let Some((_, var_b_offset)) = get_ref_from_deref(&var_b.var_expr) {
+                        Some((var_b.name.clone(), var_b_offset))
+                    } else {
+                        None
+                    },
+                _ => None
+            };
+
+        let mut simps: Vec<String> = Vec::new();
+
+        if expr.op == "-" {
+            simps.push(format!("rw [eq_sub_iff_add_eq] at {assert_hyp}"));
+        }
+        if lean_info.is_const(&expr.var_a.name) {
+            simps.push(format!("simp only [{const_name}] at {assert_hyp}", const_name = expr.var_a.name));
+        }
+        if let Some(var_b) = &expr.var_b {
+            if var_b.name != expr.var_a.name && lean_info.is_const(&var_b.name) {
+                simps.push(format!("simp only [{const_name}] at {assert_hyp}", const_name = var_b.name));
+            }
+        }
+
+        (rhs_var_a, rhs_var_b, simps)
+    }
+
     fn generate_assert_main(
         &mut self,
+        lean_info: &LeanFuncInfo,
         block: &FuncBlock,
         lhs_name: &str,
         lhs_ap_offset: i16,
@@ -3140,6 +3182,10 @@ impl CompletenessProof {
         rhs_binary_op: bool,
         // If this is a range check, the offset from the rc pointer.
         rc_check_offset: Option<BigInt>,
+        // The spec hypothesis that applies to this assert.
+        assert_hyp: &str,
+        // Simplifications that need to be applied ot the assert hypothesis
+        assert_simps: Option<&Vec<String>>,
         pc: usize,
         op_size: usize,
         indent: usize,
@@ -3176,16 +3222,31 @@ impl CompletenessProof {
             self.generate_assert_var_simp(block, &var_b_name, var_b_offset, indent);
         }
 
+        let is_rc_var = lean_info.get_vm_var_type(lhs_name) == "rc";
+
         // If this is a range check, simplify the range check expression.
         if let Some(rc_offset) = rc_check_offset {
             let offset = rc_offset.to_usize().expect("rc offset out of bounds");
             self.push_main(indent, &format!("simp only [h_rc_plus_{offset}]"));
             self.push_main(indent, &format!("simp only [Int.add_comm _ {offset}, Int.add_sub_cancel]"));
+        } else if !is_rc_var {
+            if let Some(simps) = assert_simps {
+                for simp in simps {
+                    self.push_main(indent, simp);
+                }
+            }
+            self.push_main(indent, &format!("simp only [{assert_hyp}]"));
         }
 
-        // xxxxxxxx add the additional steps that prove this step.
-        // xxxxxxxxxxxxxx add the rcases (this depends on whether this is a range check or not).
-        self.push_main(indent, "sorry");
+        if block.ap_offset != 0 {
+            self.push_main(indent, "ring_nf");
+        }
+
+        if is_rc_var {
+            self.push_main(indent, "apply Mrel.Equiv.refl_rc");
+        } else {
+            self.push_main(indent, "apply Mrel.Equiv.refl_val");
+        }
     }
 
     /// Add the return block variables (and the associated hypotheses) to the list
@@ -3310,12 +3371,15 @@ impl CompletenessProof {
                 };
 
             self.generate_assert_main(
+                lean_info,
                 block,
                 &ret_name,
                 first_ret_ap_offset + pos.to_i16().expect("Too many return positions."),
                 rhs_var_a,
                 None,
                 is_rc,
+                None,
+                &format!("h_{ret_name}"),
                 None,
                 pc,
                 op_size,
@@ -3336,7 +3400,7 @@ impl CompletenessProof {
 
     /// Generates the Lean code which handles the return from the function. This includes
     /// proving the correct rc pointer is returned.
-    fn generate_return_proof(&mut self, indent: usize, pc: usize) {
+    fn generate_return_proof(&mut self, indent: usize, lean_info: &LeanFuncInfo, block: &FuncBlock, pc: usize) {
         // Use 0 indentation (indentation is added later).
         let indent = 0;
 
@@ -3344,8 +3408,19 @@ impl CompletenessProof {
         self.push_main(indent, &format!("apply {codes}", codes = self.make_codes(pc, 1)));
         self.push_main(indent, "constructor");
         self.push_main(indent,"· vm_arith_simps");
-        // xxxxxxx complete the code here.
-        self.push_main(indent,"sorry");
+
+        if let Some(rc_name) = lean_info.get_range_check_arg_name() {
+            let num_ret = lean_info.get_ret_arg_offset(&rc_name).expect("Failed to find rc return arg offset.");
+            // The AP offset of the rc return variable.
+            let ap_offset = block.ap_offset + self.ap_assignments.len() - num_ret;
+            self.push_main(indent, "simp only [Int.ofNat_eq_coe, CharP.cast_eq_zero]");
+            self.push_main(indent, "simp only [add_sub_assoc] ; norm_num1");
+            self.push_main(indent, &format!("simp only [h_ap_plus_{ap_offset}]"));
+            self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {ap_offset}, Int.add_sub_cancel]"));
+            if block.ap_offset != 0 {
+                self.push_main(indent, "ring_nf");
+            }
+        }
     }
 
     /// Called when the end of a branch is reached, either as a result of a call to a block or
@@ -3385,7 +3460,7 @@ impl CompletenessProof {
             let indent = indent + 4;
             self.push_lean(indent, "fun (i : ℤ) =>");
             let indent = indent + 2;
-            self.push_lean(indent, &format!("match (i - {}) with", self.make_start_rc_expr(lean_info, block)));
+            self.push_lean(indent, &format!("match (i - {}) with", self.make_start_rc_expr(lean_info, block, false)));
 
             let lines: Vec<String> = self.rc_vals.iter().enumerate().map(
                 |(rc_offset, var_name)| format!("| {rc_offset} => (↑{var_name} : ℤ)")
@@ -3411,7 +3486,9 @@ impl CompletenessProof {
                 ap_len = self.ap_assignments.len(),
                 rc_len = self.rc_vals.len(),
                 ap_start = self.make_start_ap_expr(block),
-                rc_start = self.make_start_rc_expr(lean_info, block),
+                // The (range_check + 0) expression must have the '+ 0' appear explicitly in the type
+                // for blocks which are not the main block.
+                rc_start = self.make_start_rc_expr(lean_info, block, block.pc_start_pos != 0),
             )
         );
         self.push_lean(indent, "");
@@ -3567,7 +3644,11 @@ impl CompletenessProof {
                 );
                 self.push_lean(
                     indent + 2,
-                    "(by use (Int.le_add_of_nonneg_right (by norm_num1)) ; apply Int.add_lt_add_left ; norm_num1)"
+                    if block.pc_start_pos == 0 {
+                        "(by use (Int.le_add_of_nonneg_right (by norm_num1)) ; apply Int.add_lt_add_left ; norm_num1)"
+                    } else {
+                        "(by constructor ; apply Int.add_le_add_left ; norm_num1 ; rw [add_assoc] ; apply Int.add_lt_add_left ; norm_num1)"
+                    }
                 );
             }
         }
@@ -3599,13 +3680,41 @@ impl CompletenessProof {
     }
 
     /// Prove the VmRangeChecked claim
-    fn generate_range_checked_proof(&mut self, indent: usize, lean_info: &LeanFuncInfo, block: &FuncBlock) {
-        self.push_lean(indent, "· intros i hi");
-        {
-            let indent = indent + 2;
-            self.push_lean(indent, "sorry")
+    fn generate_range_checked_proof(
+        &mut self,
+        indent: usize,
+        lean_info: &LeanFuncInfo,
+        block: &FuncBlock,
+        called_block_rc_hyp: Option<&str>
+    ) {
+        let indent = if called_block_rc_hyp.is_some() {
+                self.push_lean(indent, "· apply VmRangeChecked_concat");
+                indent + 2
+            } else {
+                indent
+            };
+
+        if self.rc_vals.len() == 0 {
+            self.push_lean(indent, "· apply VmRangeChecked_zero");
+        } else {
+            let mut rc_proof_indent = indent;
+            let rc_var_names: Vec<String> = self.rc_vals.iter().rev().map(|name| name.clone()).collect();
+            for var_name in rc_var_names {
+                if rc_proof_indent == indent {
+                    self.push_lean(rc_proof_indent, "· apply VmRangeChecked_rec");
+                    rc_proof_indent = indent + 2;
+                } else {
+                    self.push_lean(rc_proof_indent, "apply VmRangeChecked_rec");
+                }
+                self.push_lean(rc_proof_indent, "· try norm_num1 ; try ring_nf");
+                self.push_lean(rc_proof_indent + 2, &format!("apply h_rc_{var_name}"));
+            }
+            self.push_lean(rc_proof_indent, "apply VmRangeChecked_zero");
         }
-        // xxxxxxxxxx
+
+        if let Some(called_block_rc_hyp) = called_block_rc_hyp {
+            self.push_lean(indent, &format!("apply {called_block_rc_hyp}"));
+        }
     }
 
     /// Append the main proof generated while going through the function to the
@@ -3761,31 +3870,19 @@ impl LeanGenerator for CompletenessProof {
     ) {
         let lhs =  rebind.get_var_name(&assign.lhs.name);
 
-        let rc_offset = if lean_info.is_range_check(&assign.expr) {
+        let (rc_offset, assert_hyp) = if lean_info.is_range_check(&assign.expr) {
             self.rc_vals.push(lhs.clone());
-            self.spec_rcases.push(format!("h_rc_{}", &lhs));
-            lean_info.get_offset_at(&assign.expr)
+            (lean_info.get_offset_at(&assign.expr), format!("h_rc_{}", &lhs))
         } else {
-            self.spec_rcases.push(format!("h_α{pc}"));
-            None
+            (None, format!("h_α{pc}"))
         };
 
-        let rhs_var_a = if let Some((_, var_a_offset)) = get_ref_from_deref(&assign.expr.var_a.var_expr) {
-            Some((assign.expr.var_a.name.clone(), var_a_offset))
-        } else {
-            None
-        };
-        let rhs_var_b = match &assign.expr.var_b {
-                Some(var_b) =>
-                    if let Some((_, var_b_offset)) = get_ref_from_deref(&var_b.var_expr) {
-                        Some((var_b.name.clone(), var_b_offset))
-                    } else {
-                        None
-                    },
-                _ => None
-            };
+        self.spec_rcases.push(assert_hyp.clone());
 
+        let (rhs_var_a, rhs_var_b, simps) =
+            CompletenessProof::get_rhs_vars_and_simps(&assign.expr, lean_info, &assert_hyp);
         self.generate_assert_main(
+            lean_info,
             block,
             &assign.lhs.name,
             get_ref_from_deref(&assign.lhs.var_expr).expect("Failed to find variable AP offset").1,
@@ -3793,6 +3890,8 @@ impl LeanGenerator for CompletenessProof {
             rhs_var_b,
             String::from("+-*/").find(&assign.expr.op).is_some(),
             rc_offset,
+            &assert_hyp,
+            Some(&simps),
             pc,
             op_size,
             indent,
@@ -3842,7 +3941,7 @@ impl LeanGenerator for CompletenessProof {
         let var_ap_offset = self.get_var_ap_offset(cond_var, rebind)
             .expect("Failed to find variable ap offset");
 
-        self.push_main(indent, &format!("simp only [h_ap_plus_{var_ap_offset}]"));
+        self.push_main(indent, &format!("simp only [h_ap_plus_{var_ap_offset}] <;>"));
         self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {var_ap_offset}, Int.add_sub_cancel]"));
     }
 
@@ -3855,7 +3954,9 @@ impl LeanGenerator for CompletenessProof {
         rebind: &VarRebind,
         indent: usize,
     ) {
-        let block_spec = format!("h_block{block_suffix}", block_suffix = block.block_suffix());
+        let block_suffix = block.block_suffix();
+
+        let block_spec = format!("h_block{block_suffix}");
         self.spec_rcases.push(block_spec.clone());
 
         // Now that we reached the end of the branch, we can generate the proof.
@@ -3872,12 +3973,14 @@ impl LeanGenerator for CompletenessProof {
 
         // Add the block hypothesis.
 
+        let block_hyp = format!("h{block_suffix}");
+        let block_rc_hyp = format!("h_rc{block_suffix}");
+
         self.push_lean(
             indent,
             &format!(
-                "have h{block_suffix} := {theorem_name}",
+                "have {block_hyp} := {theorem_name}",
                 theorem_name = self.make_block_theorem_name(lean_info, block),
-                block_suffix = block.block_suffix(),
             ),
         );
         let block_args_str = if block.has_args() { String::from(" ") + &block.args.join(" ") } else { "".into() };
@@ -3887,7 +3990,7 @@ impl LeanGenerator for CompletenessProof {
                 "".into()
             };
         let mut h_spec_parts = lean_info.get_explicit_ret_arg_names();
-        h_spec_parts.push(block_spec);
+        h_spec_parts.push(block_spec.clone());
         self.push_lean(
             indent + 2,
             &format!(
@@ -3896,13 +3999,6 @@ impl LeanGenerator for CompletenessProof {
             ),
         );
 
-        self.push_lean(
-            indent,
-            &format!(
-                "rcases h{block_suffix} with ⟨loc₁, h_rc{block_suffix}, h{block_suffix}⟩",
-                block_suffix = block.block_suffix(),
-            ),
-        );
         self.push_lean(indent,"");
         self.push_lean(
             indent,
@@ -3911,14 +4007,13 @@ impl LeanGenerator for CompletenessProof {
                 ap1 = self.make_start_ap_expr(block),
                 ap0 = self.make_start_ap_expr(calling_block),
             ));
+        self.push_lean(indent, &format!("rw [h_ap_concat] at {block_hyp}"),
+        );
         self.push_lean(
             indent,
-            &format!(
-                "have h_rc_concat : {rc1} = {rc0} + ↑loc₀.rc_num := by simp",
-                rc1 = self.make_start_rc_expr(lean_info, block),
-                rc0 = self.make_start_rc_expr(lean_info, calling_block),
-            ));
-        self.push_lean(indent, "rw [h_rc_concat, h_ap_concat] at loc₁");
+            &format!("rcases {block_hyp} with ⟨loc₁, {block_rc_hyp}, {block_hyp}⟩"),
+        );
+        self.push_lean(indent,"");
         self.push_lean(indent,"let loc := ConcatAssignments loc₀ loc₁");
         self.push_lean(indent,"");
 
@@ -3928,11 +4023,19 @@ impl LeanGenerator for CompletenessProof {
         self.generate_aux_rc_offset_hyp(indent, lean_info, block);
         self.push_lean(indent, "");
 
+        // Add the proof of the block to the main proof.
+        // (will be added at the end below).
+        self.push_main(0, "rw [assign_concat, concat_exec_num, concat_rc_num]");
+        self.push_main(0, "simp only [Nat.cast_add]");
+        self.push_main(0, "try simp only [Nat.cast_zero, Int.zero_add]");
+        self.push_main(0, "simp only [←add_assoc]");
+        self.push_main(0, &format!("apply {block_hyp}"));
+
         // Begin actual proof
         self.generate_proof_intro(indent);
 
         // Prove the VmRangeChecked claim
-        self.generate_range_checked_proof(indent, lean_info, block);
+        self.generate_range_checked_proof(indent, lean_info, block, Some(&block_rc_hyp));
 
         self.append_main_proof(indent);
     }
@@ -3946,9 +4049,40 @@ impl LeanGenerator for CompletenessProof {
         pc: usize,
         indent: usize,
     ) -> usize {
+
+        let orig_indent = indent;
+        // Use 0 indentation (indentation is added later).
+        let indent = 0;
+
+        let cond_var_name = &cond_var.0;
+
         // Add the condition hypothesis to the rcases.
-        self.spec_rcases.push(format!("h_{cond_var_name}", cond_var_name = &cond_var.0));
-        indent
+        self.spec_rcases.push(format!("h_{cond_var_name}"));
+
+        self.push_main(
+            indent,
+            &format!("-- {cond_var_name} {op} 0", op = if is_eq { "=" } else { "≠" }),
+        );
+
+        if is_eq {
+            self.push_main(indent, "swap");
+            self.push_main(indent, &format!("· simp only [h_{cond_var_name}]"));
+            self.push_main(indent + 2, "simp only [IsEmpty.forall_iff]");
+            self.push_main(indent, "intro _");
+        } else {
+            self.push_main(indent, "· intro h_cond");
+            self.push_main(indent + 2, "exfalso");
+            self.push_main(indent + 2, &format!("apply h_{cond_var_name}"));
+            self.push_main(indent + 2, "injection h_cond");
+            self.push_main(indent, "intro _");
+            self.push_main(
+                indent,
+                &format!("simp only [assign_prog, hmem{imm_pc} hmem, Mrel.toInt]", imm_pc = pc + 1)
+            );
+            self.push_main(indent, "vm_arith_simps");
+        }
+
+        orig_indent
     }
 
     /// Returns the indentation after the branch close.
@@ -3992,7 +4126,7 @@ impl LeanGenerator for CompletenessProof {
         );
 
         // Append the final part of the proof (which includes the return step).
-        self.generate_return_proof(indent, lean_info.get_pc_at(lean_info.casm_end - 1));
+        self.generate_return_proof(indent, lean_info, block, lean_info.get_pc_at(lean_info.casm_end - 1));
 
         // First, unpack the specs. Whether this is the first or second branch of a jnz
         // determines the indentation.
@@ -4009,7 +4143,7 @@ impl LeanGenerator for CompletenessProof {
         self.generate_proof_intro(indent);
 
         // Prove the VmRangeChecked claim
-        self.generate_range_checked_proof(indent, lean_info, block);
+        self.generate_range_checked_proof(indent, lean_info, block, None);
 
         // Add the steps through the statements of this particular branch (which were already
         // generated). This is the place where the indentation is added (it is the same for
@@ -4033,7 +4167,7 @@ impl LeanGenerator for CompletenessProof {
         // Use 0 indentation (indentation is added later).
         let indent = 0;
 
-        // xxxxxxxxxxx what should we do here?
+        // TODO: what should we do here?
     }
 
 }
@@ -4131,7 +4265,7 @@ fn generate_completeness_block_spec_hyp(
     let sep = if 0 < args_str.len() { " " } else { "" };
 
     if 0 < ret_args_str.len() {
-        hyp.push(format!("{prefix}∃ ({ret_args_str} : ℕ),"));
+        hyp.push(format!("{prefix}∃ ({ret_args_str} : ℤ),"));
         hyp.push(
             " ".repeat(prefix.len() + 2)
             + &format!("auto_spec_{func_name}{block_suffix}{sep}{args_str} {ret_args_str}{suffix}")
@@ -4151,7 +4285,7 @@ fn generate_user_completeness_theorem(lean_info: &LeanFuncInfo) -> Vec<String> {
     let mut user_theorem: Vec<String> = Vec::new();
     user_theorem.push(format!("theorem spec_satisfiable_{func_name}"));
     if 0 < args_str.len() {
-        user_theorem.push(format!("    ({args_str} : ℕ)"));
+        user_theorem.push(format!("    ({args_str} : ℤ)"));
         user_theorem.push(format!("    -- Add assumptions on the arguments here."));
     }
     user_theorem.push(format!("    :"));
