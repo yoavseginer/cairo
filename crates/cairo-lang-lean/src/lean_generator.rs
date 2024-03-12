@@ -1,6 +1,6 @@
 use std::hash::Hash;
 use std::{fs, iter};
-use std::cmp::{min, Ordering};
+use std::cmp::{min, max, Ordering};
 use std::path::{Path, PathBuf};
 use cairo_lang_casm::cell_expression::{CellExpression, CellOperator};
 use itertools::Itertools;
@@ -97,11 +97,17 @@ struct FuncBlock {
     start_pos: usize,
     casm_start_pos: usize,
     pc_start_pos: usize,
+    // The ap offset when entering this block.
     ap_offset: usize,
     label: Option<String>,
     args: Vec<String>,
     // Reachable return blocks.
     ret_labels: HashSet<String>,
+    // The first ap offset to be allocated in this block. This does not necessarily
+    // need to be the same as ap_offset (the offset of the ap pointer at the beginning
+    // of the block) because variables may be allocated before/after the ap pointer
+    // is advances.
+    start_local_ap: usize,
     // Maximal number of rc checks before reaching this block.
     start_rc: usize,
 }
@@ -661,6 +667,7 @@ impl<'a> LeanFuncInfo<'a> {
                 label: None,
                 args: self.get_arg_names(),
                 ret_labels: self.make_ret_labels(0),
+                start_local_ap: 0,
                 start_rc: 0,
             }
         );
@@ -678,6 +685,8 @@ impl<'a> LeanFuncInfo<'a> {
                             label: Some(desc.label.clone()),
                             args: Vec::from_iter(self.get_sorted_block_args(i, &desc.label)),
                             ret_labels: self.make_ret_labels(i),
+                            start_local_ap: self.find_max_next_ap(0, &desc.label).unwrap_or(0)
+                                .to_usize().expect("ap offset expected to be non-negative"),
                             start_rc: *self.find_max_rc_checks(0, Some(&desc.label)).get(&desc.label).unwrap_or(&0),
                         }
                     )
@@ -685,6 +694,75 @@ impl<'a> LeanFuncInfo<'a> {
                 _ => {}
             }
         }
+    }
+
+    /// Finds the first AP offset which is larger than the ap offset of all variables allocated on the stack
+    /// beginning at the given start position and before the given target label. The local assignment
+    /// of the block beginning at that label begins at the ap offset returned (when
+    /// the start position is zero).
+    fn find_max_next_ap(&self, start_pos: usize,  to_label: &str) -> Option<i16> {
+        let mut max_ap: i16 = 0;
+
+        for (i, statement) in self.aux_info.statements[start_pos..].iter().enumerate() {
+            match statement {
+                StatementDesc::Assert(assign) => {
+                    // Check the ap offsets of all variables in the assert.
+                    if let Some((_, var_offset)) = get_ref_from_deref(&assign.lhs.var_expr) {
+                        max_ap = max(max_ap, var_offset + 1);
+                    }
+                    if let Some((_, var_offset)) = get_ref_from_deref(&assign.expr.var_a.var_expr) {
+                        max_ap = max(max_ap, var_offset + 1);
+                    }
+                    if let Some(var_b) = &assign.expr.var_b {
+                        if let Some((_, var_offset)) = get_ref_from_deref(&var_b.var_expr) {
+                            max_ap = max(max_ap, var_offset + 1);
+                        }
+                    }
+                },
+                StatementDesc::TempVar(var)|StatementDesc::LocalVar(var) => {
+                    let (_, var_offset) = get_ref_from_deref(&var.var_expr).expect("Failed to find var offset");
+                    max_ap = max(max_ap, var_offset + 1);
+                },
+                StatementDesc::Jump(jump) => {
+                    let branch1 = if let Some(target) = self.get_jump_target_pos(jump) {
+                        self.find_max_next_ap(target, to_label)
+                    } else {
+                        // This is a return label, so it will never reach the target label from here.
+                        None
+                    };
+                    let branch2 = if jump.cond_var.is_some() {
+                        self.find_max_next_ap(start_pos + i + 1, to_label)
+                    } else {
+                        None
+                    };
+
+                    if branch1.is_none() && branch2.is_none() {
+                        return None; // Label cannot be reached.
+                    }
+
+                    if let Some(branch1_ap) = branch1 {
+                        max_ap = max(max_ap, branch1_ap)
+                    }
+                    if let Some(branch2_ap) = branch2 {
+                        max_ap = max(max_ap, branch2_ap)
+                    }
+
+                    return Some(max_ap);
+                },
+                StatementDesc::Label(label) => {
+                    if to_label == label.label {
+                        return Some(max_ap);
+                    }
+                },
+                StatementDesc::Fail => {
+                    return None;
+                },
+                _ => {}
+            }
+        }
+
+        // Did not reach the label
+        None
     }
 
     /// Finds the maximal number of range checks performed between a given start
@@ -705,7 +783,7 @@ impl<'a> LeanFuncInfo<'a> {
                 },
                 StatementDesc::Jump(jump) => {
                     let mut rc_counts = if let Some(target) = self.get_jump_target_pos(jump) {
-                        self.find_max_rc_checks(target + 1, to_label)
+                        self.find_max_rc_checks(target, to_label)
                     } else {
                         match to_label {
                             // This is a return label that should not be included.
@@ -1435,6 +1513,7 @@ fn generate_completeness_prelude(main_func_name: &str) -> Vec<String> {
     prelude.push(String::from("open Mrel"));
     prelude.push(String::from("set_option autoImplicit false"));
     prelude.push(String::from("set_option maxRecDepth 1024"));
+    prelude.push(String::from("set_option maxHeartbeats 1000000"));
     prelude.push(String::from(""));
     prelude.push(format!("open {}", lean_vm_code_name(main_func_name)));
     prelude.push(String::from(""));
@@ -2868,8 +2947,6 @@ struct CompletenessProof {
     /// Was this branch was created as the 'equals' branch in a conditional
     /// jump? In all other cases, false.
     is_eq_branch: bool,
-    /// The offset from the function start ap at which the block starts.
-    ap_offset: usize,
     statement: Vec<String>,
 
     /// For each positive offset from the initial ap, the name of the variable
@@ -2895,7 +2972,6 @@ impl CompletenessProof {
     pub fn new() -> CompletenessProof {
         CompletenessProof {
             is_eq_branch: false,
-            ap_offset: 0,
             statement: Vec::new(),
             ap_assignments: Vec::new(),
             rc_vals: Vec::new(),
@@ -2937,6 +3013,10 @@ impl CompletenessProof {
 
     fn make_codes(&self, pc: usize, op_size: usize) -> String {
         (pc..pc + op_size).map(|i| format!("hmem{} hmem", i)).join(", ")
+    }
+
+    fn make_start_local_ap_expr(&self, block: &FuncBlock) -> String {
+        if block.start_local_ap == 0 { "σ.ap".into() } else { format!("(σ.ap + {})", block.start_local_ap) }
     }
 
     fn make_start_ap_expr(&self, block: &FuncBlock) -> String {
@@ -3013,8 +3093,10 @@ impl CompletenessProof {
         block: &FuncBlock,
         indent: usize,
     ) {
-        // Create the ap and rc memory offsets expressions for the beginning of the block.
+        // Expression for the ap of the state at the beginning of the block.
         let ap_expr = self.make_start_ap_expr(block);
+        // Create the start ap and rc memory offsets expressions for the local assignment of this block.
+        let start_local_ap_expr = self.make_start_local_ap_expr(block);
         // When the offset is zero, and this is not the main block, we sometimes need the zero offset to appear explicitly
         // and sometimes not (as the + 0 is sometimes simplified away).
         let rc_expr_explicit_offset = self.make_start_rc_expr(lean_info, block, block.pc_start_pos != 0);
@@ -3027,7 +3109,7 @@ impl CompletenessProof {
 
         // Conclusion
         self.push_statement(indent, "-- conclusion");
-        self.push_statement(indent, &format!(": ∃ loc : LocalAssignment {ap_expr} {rc_expr_explicit_offset},"));
+        self.push_statement(indent, &format!(": ∃ loc : LocalAssignment {start_local_ap_expr} {rc_expr_explicit_offset},"));
 
         let indent = indent + 2;
 
@@ -3037,7 +3119,7 @@ impl CompletenessProof {
         let indent = indent + 2;
 
         if let Some(rc_name) = lean_info.get_range_check_arg_name() {
-            self.push_statement(indent, &format!("τ.ap = {ap_expr} + loc.exec_num ∧"));
+            self.push_statement(indent, &format!("τ.ap = {start_local_ap_expr} + loc.exec_num ∧"));
             self.push_statement(
                 indent,
                 &format!("Assign mem loc (exec (τ.ap - {num_ret})) = rc ({rc_expr} + loc.rc_num)) := by",
@@ -3045,7 +3127,7 @@ impl CompletenessProof {
                 ),
             );
         } else {
-            self.push_statement(indent, &format!("τ.ap = {ap_expr} + loc.exec_num"));
+            self.push_statement(indent, &format!("τ.ap = {start_local_ap_expr} + loc.exec_num"));
         }
     }
 
@@ -3121,14 +3203,19 @@ impl CompletenessProof {
         if ap_offset < 0 {
             self.push_main(indent, &format!("simp only [h_ap_minus_{offset}]", offset = -ap_offset));
         } else {
+            if ap_offset == 0 {
+                self.push_main(indent, "try simp only [add_zero]");
+            }
             self.push_main(indent, &format!("simp only [h_ap_plus_{ap_offset}]"));
         }
 
-        if ap_offset < 0 || ap_offset.to_usize().unwrap() < block.ap_offset {
-            self.push_main(indent, &format!("simp only [←htv_{var_name}]"))
+        if ap_offset < 0 || ap_offset.to_usize().unwrap() < block.start_local_ap {
+            self.push_main(indent, &format!("simp only [←htv_{var_name}]"));
+        } /*else if ap_offset == 0 {
+            self.push_main(indent, "simp only [Int.sub_self]");
         } else {
-            self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {ap_offset}, Int.add_sub_cancel]"))
-        }
+            self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {ap_offset}, Int.add_sub_cancel]"));
+        }*/
     }
 
     /// Generates the description of the rhs variables of an assert or variable assignment. Also generates
@@ -3141,6 +3228,16 @@ impl CompletenessProof {
 
         let rhs_var_a = if let Some((_, var_a_offset)) = get_ref_from_deref(&expr.var_a.var_expr) {
             Some((expr.var_a.name.clone(), var_a_offset))
+        } else if expr.op == "*()" {
+            match expr.var_a.var_expr {
+                CellExpression::BinOp { op: _, a , b: _ } => {
+                    Some((expr.var_a.name.clone(), a.offset))
+                },
+                CellExpression::DoubleDeref(a, _) => {
+                    Some((expr.var_a.name.clone(), a.offset))
+                },
+                _ => None
+            }
         } else {
             None
         };
@@ -3202,7 +3299,7 @@ impl CompletenessProof {
         self.push_main(indent, "try simp only [hin_fp]");
 
         // If the expression consists of an immediate value, simplify it.
-        if rhs_var_a.is_none() || (rhs_binary_op && rhs_var_b.is_none()) {
+        if 1 < op_size && (rhs_var_a.is_none() || (rhs_binary_op && rhs_var_b.is_none())) {
             self.push_main(
                 indent,
                 &format!(
@@ -3215,11 +3312,14 @@ impl CompletenessProof {
 
         // Simplify the variables in this expression.
         self.generate_assert_var_simp(block, lhs_name, lhs_ap_offset, indent);
-        if let Some((var_a_name, var_a_offset)) = rhs_var_a {
-            self.generate_assert_var_simp(block, &var_a_name, var_a_offset, indent);
+        if let Some((var_a_name, var_a_offset)) = &rhs_var_a {
+            self.generate_assert_var_simp(block, var_a_name, *var_a_offset, indent);
         }
-        if let Some((var_b_name, var_b_offset)) = rhs_var_b {
-            self.generate_assert_var_simp(block, &var_b_name, var_b_offset, indent);
+        if let Some((var_b_name, var_b_offset)) = &rhs_var_b {
+            match &rhs_var_a {
+                Some((var_a_name, var_a_offset)) if var_a_name == var_b_name => {},
+                _ => self.generate_assert_var_simp(block, var_b_name, *var_b_offset, indent)
+            }
         }
 
         let is_rc_var = lean_info.get_vm_var_type(lhs_name) == "rc";
@@ -3228,18 +3328,18 @@ impl CompletenessProof {
         if let Some(rc_offset) = rc_check_offset {
             let offset = rc_offset.to_usize().expect("rc offset out of bounds");
             self.push_main(indent, &format!("simp only [h_rc_plus_{offset}]"));
-            self.push_main(indent, &format!("simp only [Int.add_comm _ {offset}, Int.add_sub_cancel]"));
+            self.push_main(indent, "try ring_nf");
+            // self.push_main(indent, &format!("simp only [Int.add_comm _ {offset}, Int.add_sub_cancel]"));
         } else if !is_rc_var {
+            self.push_main(indent, "try ring_nf");
             if let Some(simps) = assert_simps {
                 for simp in simps {
                     self.push_main(indent, simp);
                 }
             }
             self.push_main(indent, &format!("simp only [{assert_hyp}]"));
-        }
-
-        if block.ap_offset != 0 {
-            self.push_main(indent, "ring_nf");
+        } else {
+            self.push_main(indent, "try ring_nf");
         }
 
         if is_rc_var {
@@ -3331,7 +3431,7 @@ impl CompletenessProof {
 
         // All the return positions were added at the end of the ap assignment, so we find the ap offset
         // (relative to σ.ap) based on their number.
-        let first_ret_ap_offset: i16 = (self.ap_assignments.len() + block.ap_offset - lean_info.ret_arg_num()).try_into().expect("offset out of bound");
+        let first_ret_ap_offset: i16 = (self.ap_assignments.len() + block.start_local_ap - lean_info.ret_arg_num()).try_into().expect("offset out of bound");
 
         // Go over all return argument positions, also those that are not used by this branch.
         // TODO: this code is partially duplicated in the other generators, merge the common parts.
@@ -3412,14 +3512,14 @@ impl CompletenessProof {
         if let Some(rc_name) = lean_info.get_range_check_arg_name() {
             let num_ret = lean_info.get_ret_arg_offset(&rc_name).expect("Failed to find rc return arg offset.");
             // The AP offset of the rc return variable.
-            let ap_offset = block.ap_offset + self.ap_assignments.len() - num_ret;
+            let ap_offset = block.start_local_ap + self.ap_assignments.len() - num_ret;
             self.push_main(indent, "simp only [Int.ofNat_eq_coe, CharP.cast_eq_zero]");
             self.push_main(indent, "simp only [add_sub_assoc] ; norm_num1");
-            self.push_main(indent, &format!("simp only [h_ap_plus_{ap_offset}]"));
-            self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {ap_offset}, Int.add_sub_cancel]"));
-            if block.ap_offset != 0 {
-                self.push_main(indent, "ring_nf");
+            if ap_offset == 0 { // Unlikely here.
+                self.push_main(indent, "try simp only [add_zero]");
             }
+            self.push_main(indent, &format!("simp only [h_ap_plus_{ap_offset}]"));
+            self.push_main(indent, "try ring_nf");
         }
     }
 
@@ -3438,7 +3538,7 @@ impl CompletenessProof {
             let indent = indent + 4;
             self.push_lean(indent, "fun (i : ℤ) =>");
             let indent = indent + 2;
-            self.push_lean(indent, &format!("match (i - {}) with", self.make_start_ap_expr(block)));
+            self.push_lean(indent, &format!("match (i - {}) with", self.make_start_local_ap_expr(block)));
 
             let lines: Vec<String> = self.ap_assignments.iter().enumerate().map(
                 |(ap_offset, var_expr)| {
@@ -3485,7 +3585,7 @@ impl CompletenessProof {
                 "let {loc_name} := (⟨{ap_len}, exec_vals, {rc_len}, rc_vals⟩ : LocalAssignment {ap_start} {rc_start})",
                 ap_len = self.ap_assignments.len(),
                 rc_len = self.rc_vals.len(),
-                ap_start = self.make_start_ap_expr(block),
+                ap_start = self.make_start_local_ap_expr(block),
                 // The (range_check + 0) expression must have the '+ 0' appear explicitly in the type
                 // for blocks which are not the main block.
                 rc_start = self.make_start_rc_expr(lean_info, block, block.pc_start_pos != 0),
@@ -3507,7 +3607,7 @@ impl CompletenessProof {
             let var_type = lean_info.get_vm_var_type(&arg_name);
             // Need to distinguish between arguments in the local assignment and outside it
             let (_, offset) = get_ref_from_deref(&expr).expect("Failed to find argument offset.");
-            if 0 <= offset && calling_block.ap_offset <= offset as usize {
+            if 0 <= offset && calling_block.start_local_ap <= offset as usize {
                 // Auxiliary construction.
                 self.push_lean(
                     indent,
@@ -3530,12 +3630,36 @@ impl CompletenessProof {
                 )
             );
 
-            if offset < 0 || (offset as usize) < calling_block.ap_offset {
-                // outside the local assignment.
+            if offset < 0 { // outside the local assignment.
+                if calling_block.start_local_ap == 0 {
+                    self.push_lean(
+                        indent + 2,
+                        &format!(
+                            "simp only [assign_exec_of_lt mem loc₀ {var_ref} (by apply Int.sub_lt_self ; norm_num1), htv_{arg_name}]",
+                            // Here we use the non-vm expression (as the theorem takes an offset in Z).
+                            var_ref = get_lean_ref_from_deref(&expr, true, false, true),
+                        ),
+                    );
+                } else {
+                    self.push_lean(
+                        indent + 2,
+                        &format!(
+                            "have := assign_exec_of_lt mem loc₀ {var_ref}",
+                            // Here we use the non-vm expression (as the theorem takes an offset in Z).
+                            var_ref = get_lean_ref_from_deref(&expr, true, false, true),
+                        ),
+                    );
+                    self.push_lean(
+                        indent + 4,
+                        "(by apply lt_trans _ (Int.lt_add_of_pos_right σ.ap (by norm_num1)) ; apply Int.sub_lt_self ; norm_num1)",
+                    );
+                    self.push_lean(indent + 2, &format!("simp only [this, htv_{arg_name}]"));
+                }
+            } else if (offset as usize) < calling_block.start_local_ap {
                 self.push_lean(
                     indent + 2,
                     &format!(
-                        "simp only [assign_exec_of_lt mem loc₀ {var_ref} (by apply Int.sub_lt_self ; norm_num1), htv_{arg_name}]",
+                        "simp only [assign_exec_of_lt mem loc₀ {var_ref} (by apply Int.add_lt_add_left ; norm_num1), htv_{arg_name}]",
                         // Here we use the non-vm expression (as the theorem takes an offset in Z).
                         var_ref = get_lean_ref_from_deref(&expr, true, false, true),
                     ),
@@ -3571,7 +3695,7 @@ impl CompletenessProof {
                     );
                     self.push_lean(
                         indent + 2,
-                        if 0 < block.ap_offset {
+                        if 0 < block.start_local_ap {
                             "(by apply lt_trans _ (Int.lt_add_of_pos_right _ (by norm_num1)) ; apply Int.sub_lt_self ; norm_num1)"
                         } else {
                             "(by apply Int.sub_lt_self ; norm_num1)"
@@ -3605,19 +3729,32 @@ impl CompletenessProof {
     ) {
         // Create the auxiliary ap offset claims
 
-        for offset in block.ap_offset..block.ap_offset + self.ap_assignments.len() {
+        for offset in block.start_local_ap..block.start_local_ap + self.ap_assignments.len() {
             if is_concat {
-                self.push_lean(
-                    indent,
-                    &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ (σ.ap + {offset})")
-                );
+                if offset == 0 {
+                    self.push_lean(
+                        indent,
+                        &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ σ.ap")
+                    );
+                } else {
+                    self.push_lean(
+                        indent,
+                        &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ (σ.ap + {offset})")
+                    );
+                }
             } else {
-                self.push_lean(indent, &format!("have h_ap_plus_{offset} := assign_exec_pos mem loc (σ.ap + {offset})"));
+                if offset == 0 {
+                    self.push_lean(indent, &format!("have h_ap_plus_{offset} := assign_exec_pos mem loc σ.ap"));
+                } else {
+                    self.push_lean(indent, &format!("have h_ap_plus_{offset} := assign_exec_pos mem loc (σ.ap + {offset})"));
+                }
             }
 
             self.push_lean(
                 indent + 2,
-                if block.ap_offset == 0 {
+                if block.start_local_ap == 0 && offset == 0 {
+                    "(by use le_refl _ ; apply Int.lt_add_of_pos_right ; norm_num1)"
+                } else if block.start_local_ap == 0 {
                     "(by use (Int.le_add_of_nonneg_right (by norm_num1)) ; apply Int.add_lt_add_left ; norm_num1)"
                 } else {
                     "(by constructor ; apply Int.add_le_add_left ; norm_num1 ; rw [add_assoc] ; apply Int.add_lt_add_left ; norm_num1)"
@@ -3759,7 +3896,6 @@ impl LeanGenerator for CompletenessProof {
         block: &FuncBlock,
         indent: usize,
     ) {
-        self.ap_offset = block.ap_offset;
         self.push_statement(
             indent,
             &format!(
@@ -3941,8 +4077,15 @@ impl LeanGenerator for CompletenessProof {
         let var_ap_offset = self.get_var_ap_offset(cond_var, rebind)
             .expect("Failed to find variable ap offset");
 
+        if var_ap_offset == 0 {
+            self.push_main(indent, "try simp only [add_zero] <;>");
+        }
         self.push_main(indent, &format!("simp only [h_ap_plus_{var_ap_offset}] <;>"));
-        self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {var_ap_offset}, Int.add_sub_cancel]"));
+        if var_ap_offset == 0 {
+            self.push_main(indent, "simp only [Int.sub_self]");
+        } else {
+            self.push_main(indent, &format!("simp only [Int.add_comm σ.ap {var_ap_offset}, Int.add_sub_cancel]"));
+        }
     }
 
     fn generate_label_block(
@@ -4004,8 +4147,8 @@ impl LeanGenerator for CompletenessProof {
             indent,
             &format!(
                 "have h_ap_concat : {ap1} = {ap0} + ↑loc₀.exec_num := by simp",
-                ap1 = self.make_start_ap_expr(block),
-                ap0 = self.make_start_ap_expr(calling_block),
+                ap1 = self.make_start_local_ap_expr(block),
+                ap0 = self.make_start_local_ap_expr(calling_block),
             ));
         self.push_lean(indent, &format!("rw [h_ap_concat] at {block_hyp}"),
         );
