@@ -3734,12 +3734,12 @@ impl CompletenessProof {
                 if offset == 0 {
                     self.push_lean(
                         indent,
-                        &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ σ.ap")
+                        &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ h_ap_concat h_rc_concat σ.ap")
                     );
                 } else {
                     self.push_lean(
                         indent,
-                        &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ (σ.ap + {offset})")
+                        &format!("have h_ap_plus_{offset} := assign_exec_concat_loc₀ mem loc₀ loc₁ h_ap_concat h_rc_concat (σ.ap + {offset})")
                     );
                 }
             } else {
@@ -4150,14 +4150,19 @@ impl LeanGenerator for CompletenessProof {
                 ap1 = self.make_start_local_ap_expr(block),
                 ap0 = self.make_start_local_ap_expr(calling_block),
             ));
-        self.push_lean(indent, &format!("rw [h_ap_concat] at {block_hyp}"),
-        );
+        self.push_lean(
+            indent,
+            &format!(
+                "have h_rc_concat : {rc1} = {rc0} + ↑loc₀.rc_num := by simp",
+                rc1 = self.make_start_rc_expr(lean_info, block, true),
+                rc0 = self.make_start_rc_expr(lean_info, calling_block, false),
+            ));
         self.push_lean(
             indent,
             &format!("rcases {block_hyp} with ⟨loc₁, {block_rc_hyp}, {block_hyp}⟩"),
         );
         self.push_lean(indent,"");
-        self.push_lean(indent,"let loc := ConcatAssignments loc₀ loc₁");
+        self.push_lean(indent,"let loc := ConcatAssignments loc₀ loc₁ h_ap_concat h_rc_concat");
         self.push_lean(indent,"");
 
         // Create the auxiliary ap offset and rc offset claims
