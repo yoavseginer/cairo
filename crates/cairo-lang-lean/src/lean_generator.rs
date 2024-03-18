@@ -3328,10 +3328,12 @@ impl CompletenessProof {
         if let Some(rc_offset) = rc_check_offset {
             let offset = rc_offset.to_usize().expect("rc offset out of bounds");
             self.push_main(indent, &format!("simp only [h_rc_plus_{offset}]"));
-            self.push_main(indent, "try ring_nf");
+            self.push_main(indent, "try simp only [add_sub_add_comm, add_sub_right_comm, sub_add_cancel', sub_self] ; try norm_num1");
+            // self.push_main(indent, "try ring_nf");
             // self.push_main(indent, &format!("simp only [Int.add_comm _ {offset}, Int.add_sub_cancel]"));
         } else if !is_rc_var {
-            self.push_main(indent, "try ring_nf");
+            self.push_main(indent, "try simp only [add_sub_add_comm, add_sub_right_comm, sub_add_cancel', sub_self] ; try norm_num1");
+            // self.push_main(indent, "try ring_nf");
             if let Some(simps) = assert_simps {
                 for simp in simps {
                     self.push_main(indent, simp);
@@ -3339,7 +3341,8 @@ impl CompletenessProof {
             }
             self.push_main(indent, &format!("simp only [{assert_hyp}]"));
         } else {
-            self.push_main(indent, "try ring_nf");
+            self.push_main(indent, "try simp only [add_sub_add_comm, add_sub_right_comm, sub_add_cancel', sub_self] ; try norm_num1");
+            // self.push_main(indent, "try ring_nf");
         }
 
         if is_rc_var {
@@ -3519,6 +3522,7 @@ impl CompletenessProof {
                 self.push_main(indent, "try simp only [add_zero]");
             }
             self.push_main(indent, &format!("simp only [h_ap_plus_{ap_offset}]"));
+            // self.push_main(indent, "try simp only [add_sub_add_comm, add_sub_right_comm, sub_add_cancel', sub_self] ; try norm_num1");
             self.push_main(indent, "try ring_nf");
         }
     }
@@ -3770,15 +3774,26 @@ impl CompletenessProof {
         indent: usize,
         lean_info: &LeanFuncInfo,
         block: &FuncBlock,
+        // Is the assignment of this block a concatenation of this block together with a called block?
+        is_concat: bool,
     ) {
         let rc_ptr = lean_info.get_range_check_arg_name();
 
         if let Some(rc_ptr) = rc_ptr {
             for offset in block.start_rc..block.start_rc + self.rc_vals.len() {
-                self.push_lean(
-                    indent,
-                    &format!("have h_rc_plus_{offset} := assign_rc_pos mem loc ({rc_ptr} + {offset})")
-                );
+
+                if is_concat {
+                    self.push_lean(
+                        indent,
+                        &format!("have h_rc_plus_{offset} := assign_rc_concat_loc₀ mem loc₀ loc₁ h_ap_concat h_rc_concat ({rc_ptr} + {offset})")
+                    );
+                } else {
+                    self.push_lean(
+                        indent,
+                        &format!("have h_rc_plus_{offset} := assign_rc_pos mem loc ({rc_ptr} + {offset})")
+                    );
+                }
+
                 self.push_lean(
                     indent + 2,
                     if block.pc_start_pos == 0 {
@@ -3871,6 +3886,7 @@ impl LeanGenerator for CompletenessProof {
         branch.is_eq_branch = true;
         // For information passed down the branch, need to clone that information.
         branch.ap_assignments = self.ap_assignments.clone();
+        branch.rc_vals = self.rc_vals.clone();
         branch.main_proof = self.main_proof.clone();
         branch
     }
@@ -4168,7 +4184,7 @@ impl LeanGenerator for CompletenessProof {
         // Create the auxiliary ap offset and rc offset claims
         self.generate_aux_arg_offset_hyp(indent, lean_info, calling_block);
         self.generate_aux_ap_offset_hyp(indent, lean_info, calling_block, true);
-        self.generate_aux_rc_offset_hyp(indent, lean_info, block);
+        self.generate_aux_rc_offset_hyp(indent, lean_info, calling_block, true);
         self.push_lean(indent, "");
 
         // Add the proof of the block to the main proof.
@@ -4284,7 +4300,7 @@ impl LeanGenerator for CompletenessProof {
         // Create the auxiliary ap offset and rc offset claims
         self.generate_aux_arg_offset_hyp(indent, lean_info, block);
         self.generate_aux_ap_offset_hyp(indent, lean_info, block, false);
-        self.generate_aux_rc_offset_hyp(indent, lean_info, block);
+        self.generate_aux_rc_offset_hyp(indent, lean_info, block, false);
         self.push_lean(indent, "");
 
         // Begin of actual proof.
