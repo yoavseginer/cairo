@@ -331,7 +331,7 @@ pub fn run_test_file(
     let lean_outputs = vec!(
         "lean_soundness_spec",
         "lean_soundness",
-        "lean_completenessness_spec",
+        "lean_completeness_spec",
         "lean_completeness",
         "lean_code",
     );
