@@ -4,7 +4,6 @@ pub use alloc::borrow::ToOwned;
 use alloc::{string::String, vec, vec::Vec};
 #[cfg(feature = "std")]
 pub use std::borrow::ToOwned;
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::env::Vars;
 
@@ -688,14 +687,14 @@ impl Default for CasmBuilder {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarBaseDesc {
     pub name: String,
     pub var_id: Var,
     pub var_expr: CellExpression,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ExprDesc {
     pub expr: String,
     pub var_a: VarBaseDesc,
@@ -703,7 +702,7 @@ pub struct ExprDesc {
     pub var_b: Option<VarBaseDesc>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarDesc {
     pub name: String,
     pub var_id: Var,
@@ -712,14 +711,14 @@ pub struct VarDesc {
     pub ap_change: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AssertDesc {
     pub lhs: VarBaseDesc,
     pub expr: ExprDesc,
     pub ap_change: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ConstDesc {
     pub name: String,
     pub var_id: Var,
@@ -727,25 +726,25 @@ pub struct ConstDesc {
     pub value: CellExpression,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct JumpDesc {
     pub target: String,
     pub cond_var: Option<(String, Var)>,
     pub ap_change: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LabelDesc {
     pub label: String,
     pub ap_change: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RetExprDesc {
     pub names: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RetBranchDesc {
     pub name: String,
     pub exprs: Vec<RetExprDesc>,
@@ -788,7 +787,7 @@ impl RetBranchDesc {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StatementDesc {
     TempVar(VarDesc),
     LocalVar(VarDesc),
@@ -800,7 +799,7 @@ pub enum StatementDesc {
     Fail,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CasmBuilderAuxiliaryInfo {
     pub var_names: HashMap<Var, String>,
     pub consts: Vec<ConstDesc>,
