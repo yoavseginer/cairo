@@ -662,6 +662,7 @@ name = "cairo-lang-lean"
 version = "2.6.3"
 dependencies = [
  "cairo-lang-casm",
+ "cairo-lang-sierra",
  "cairo-lang-sierra-to-casm",
  "cairo-lang-utils",
  "itertools 0.12.1",
